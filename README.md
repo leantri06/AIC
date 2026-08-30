@@ -262,41 +262,42 @@ python -m aic2026.cli evaluate query_kis.json outputs/candidates_kis.json ground
 
 ## 9. Chi tiết Công nghệ Hiện tại & Đề xuất Nâng cấp Tiên tiến
 
-### 8.1. Bảng Tổng quan Công nghệ theo từng Chế độ
+### 9.1. Bảng Tổng quan Công nghệ theo từng Chế độ
 
 | Chế độ / Nhiệm vụ | 🛠️ Công nghệ Hiện tại (Current PEGASUS) | 🚀 Đề xuất Nâng cấp Tiên tiến (SOTA Upgrades) |
 | :--- | :--- | :--- |
-| **👁️ Thị giác (SigLIP)** | • OpenCLIP `ViT-SO400M-14-SigLIP-384` (`webli`)<br>• Multi-template Prompt Ensembling (5 prompts)<br>• Vectorized Cosine Similarity / FAISS Index<br>• Temporal Gaussian Smoothing ($\sigma=1.5, w=3$)<br>• Video-level LogSumExp aggregation | • **Video-Language Models (VLM video-native):** `InternVideo2`, `VideoLLaMA3`, `Video-LLaVA` hiểu trực tiếp chuỗi chuyển động spatio-temporal thay vì frame tĩnh.<br>• **CLIP chuyên biệt Tiếng Việt & Đa ngữ:** `EVA-02-CLIP-E/14+`, `DFN-5B`, hoặc Fine-tune `ViCLIP` / `PhoCLIP`.<br>• **Fine-grained Region Grounding:** `Grounding DINO` + `SAM2` trích xuất embedding từng vùng đối tượng nhỏ/chìm. |
+| **👁️ Thị giác (SigLIP 2 & Vector Search)** | • **Google SigLIP 2** `ViT-SO400M-14-SigLIP2-378` (SOTA) & SigLIP 1 `ViT-SO400M-14-SigLIP-384`<br>• Multi-template Prompt Ensembling (5 prompts)<br>• Vectorized Cosine Similarity / FAISS Index<br>• GQE 4-Facet SRRF Decomposition (`q_core`, `q_entity`, `q_action`, `q_scene`)<br>• Temporal Gaussian Smoothing ($\sigma=1.5, w=3$) | • **Video-Language Models (VLM video-native):** `InternVideo2`, `VideoLLaMA3`, `Video-LLaVA` hiểu trực tiếp chuỗi chuyển động spatio-temporal thay vì frame tĩnh.<br>• **CLIP chuyên biệt Tiếng Việt & Đa ngữ:** `EVA-02-CLIP-E/14+`, `DFN-5B`, hoặc Fine-tune `ViCLIP` / `PhoCLIP`.<br>• **Fine-grained Region Grounding:** `Grounding DINO` + `SAM2` trích xuất embedding từng vùng đối tượng nhỏ/chìm. |
+| **⚖️ VLM-as-a-Judge (Phán Quyết Thị Giác)** | • **Qwen2.5-VL-7B-Instruct** làm Trọng tài Thị giác Giai đoạn 2 (2nd-stage High-Precision Reranker):<br>  - **KIS:** Thẩm định chi tiết màu sắc, vật thể, hành động, graffiti, tranh vẽ.<br>  - **QA:** Thẩm định bằng chứng thị giác trực tiếp (Visual Evidence) đưa frame chứa đáp án lên Top 1.<br>  - **TRAKE:** Thẩm định tính nhất quán chuỗi đa sự kiện $(f_1 \to f_2 \to \dots \to f_N)$.<br>• Score Blending: $S_{\text{blended}} = S_{\text{retrieval}} \cdot (1 - w) + \frac{S_{\text{vlm}}}{100} \cdot w$ | • **Domain-specific Fine-tuning:** Fine-tune Qwen2.5-VL trên tập dữ liệu AIC các năm trước để nhận diện chính xác các câu hỏi đặc thù BTC.<br>• **Direct Video Chunk Verification:** Truyền 4–8 keyframe liên tiếp quanh mốc thời gian để VLM kiểm tra chuyển động ngữ cảnh. |
 | **🗣️ Lời thoại (ASR)** | • BM25Okapi Lexical Indexing<br>• Tokenizer Tiếng Việt nâng cao (NFC, Bigram ghép từ phức, Accent-folded variants)<br>• Khớp timestamp PTS thời gian thực từ `map-keyframes` | • **Dense Semantic Dialogue Retrieval:** `BGE-M3` (1024-dim đa ngữ), `Vietnamese-Bi-Encoder` hoặc `PhoBERT-v2` để hiểu ngữ cảnh tương đồng (ví dụ: *"hoàn cảnh éo le"* $\leftrightarrow$ *"mẹ mất sớm, nhà nghèo"*).<br>• **ASR Re-transcription & Diarization:** `Whisper-large-v3-turbo` + `PyAnnote` phân tách từng người nói và tự thêm dấu câu chuẩn xác.<br>• **Hybrid Dense-Sparse (SPLADE):** Kết hợp BM25 + Learned Lexical Expansion. |
 | **🔤 Chữ màn hình & Vật thể (OCR/Objects)** | • PaddleOCR (Tiếng Việt/Anh)<br>• Nhãn Faster R-CNN Google OpenImages (873 videos)<br>• Dual-threshold filtering (score $\ge 0.3$, presence $\ge 0.4$)<br>• BM25 Lexical Index với IDF Floor ($0.01$) | • **SOTA Vision OCR:** `GOT-OCR2.0` hoặc `Qwen2-VL` (đọc được chữ xoay nghiêng, logo mờ, biển số xe xa, chữ cách điệu).<br>• **Fuzzy Token Matching / Levenshtein N-gram:** Tự động sửa lỗi sai 1-2 ký tự do OCR nhận diện nhầm (ví dụ: `VTVl` $\rightarrow$ `VTV1`, `Hà Nọi` $\rightarrow$ `Hà Nội`).<br>• **Scene Text VQA:** Trả lời trực tiếp nội dung văn bản trên ảnh mà không cần bóc tách OCR riêng rẽ. |
-| **🌈 Đa kênh (Hybrid Fusion)** | • Dynamic Modality Routing<br>• Score-Reflected Reciprocal Rank Fusion (SRRF)<br>• Trọng số động ($w_{\text{vis}}, w_{\text{ocr}}, w_{\text{asr}}$)<br>• Metadata / Text-in-Scene Reranking | • **Learned Late-Interaction (ColBERT / ColPali):** Tính tương đồng multi-vector giữa từng từ của câu hỏi và từng token visual của frame.<br>• **Cross-Encoder Reranker:** Mô hình rerank đa phương thức (ví dụ: `BGE-Reranker-Large`, `Cohere Rerank v3`) xếp hạng lại Top 100 candidate.<br>• **Adaptive Meta-Classifier:** Mô hình phân loại tự động gán trọng số $w_{\text{vis}}, w_{\text{ocr}}, w_{\text{asr}}$ dựa trên đặc trưng ngôn ngữ của câu query. |
-| **🎬 Chuỗi hành động (TRAKE)** | • Dynamic Programming Monotonic Alignment ($O(T \cdot N)$)<br>• Sequence Time-Gap Regularization ($t_1 < t_2 < \dots < t_n$)<br>• Trực quan hóa cụm timeline liên hoàn trên Web UI | • **Temporal Action Localization:** `ActionFormer` hoặc `TriDet` phát hiện chính xác ranh giới bắt đầu/kết thúc của từng hành động đơn lẻ.<br>• **Video Event Graph Reasoning:** Xây dựng đồ thị liên kết đối tượng qua các frame để kiểm tra tính nhất quán (người A cầm chai $\rightarrow$ mở nắp $\rightarrow$ uống). |
-| **❓ Truy vấn Hỏi đáp (QA Retrieval)** | • Zero-VLM Fast Retrieval ($<1$s)<br>• Query Synthesis (Context text + Question keywords)<br>• Trực quan hóa Badge OCR `🔤` & ASR `🗣️` trên từng frame card để người dùng xác thực trực quan tức thì | • **Ultra-lightweight On-Demand VLM:** Tích hợp `PaliGemma-2` (3B) hoặc `SmolVLM` (2B) — chỉ chạy khi người dùng chủ động nhấn *"Phân tích đối tượng"* trên frame cụ thể để crop và trả lời câu hỏi chi tiết. |
+| **🌈 Đa kênh (Hybrid Fusion)** | • Dynamic Modality Routing<br>• Score-Reflected Reciprocal Rank Fusion (SRRF)<br>• Trọng số động ($w_{\text{vis}}, w_{\text{ocr}}, w_{\text{asr}}$)<br>• Metadata / Text-in-Scene Reranking + VLM Judge Reranking | • **Learned Late-Interaction (ColPali):** Tính tương đồng multi-vector giữa từng từ của câu hỏi và từng token visual của frame.<br>• **Cross-Encoder Reranker:** Mô hình rerank đa phương thức (ví dụ: `BGE-Reranker-Large`, `Cohere Rerank v3`) xếp hạng lại Top 100 candidate.<br>• **Adaptive Meta-Classifier:** Mô hình phân loại tự động gán trọng số $w_{\text{vis}}, w_{\text{ocr}}, w_{\text{asr}}$ dựa trên đặc trưng ngôn ngữ của câu query. |
+| **🎬 Chuỗi hành động (TRAKE)** | • Dynamic Programming Monotonic Alignment ($O(T \cdot N)$)<br>• Sequence Time-Gap Regularization ($t_1 < t_2 < \dots < t_n$)<br>• VLM Judge thẩm định chuỗi đa ảnh theo thời gian<br>• Trực quan hóa timeline liên hoàn trên Web UI | • **Temporal Action Localization:** `ActionFormer` hoặc `TriDet` phát hiện chính xác ranh giới bắt đầu/kết thúc của từng hành động đơn lẻ.<br>• **Video Event Graph Reasoning:** Xây dựng đồ thị liên kết đối tượng qua các frame để kiểm tra tính nhất quán (người A cầm chai $\rightarrow$ mở nắp $\rightarrow$ uống). |
+| **❓ Truy vấn Hỏi đáp (QA Retrieval)** | • Visual Evidence Verification bằng Qwen2.5-VL (đưa frame có góc nhìn chứa đáp án lên Top 1)<br>• Query Synthesis (Context text + Question keywords)<br>• Trực quan hóa Badge OCR `🔤`, ASR `🗣️` & Evidence Score `🎯` để người dùng xác thực và trả lời tức thì | • **Bounding-box Zoom-in VQA:** Tự động crop vùng vật thể nghi vấn trong keyframe và phóng to cho VLM đọc các chi tiết siêu nhỏ (chữ trên đồng hồ, logo túi xách). |
 
 ---
 
-### 8.2. Chi tiết & Hướng dẫn Triển khai Nâng cấp
+### 9.2. Chi tiết & Hướng dẫn Triển khai Nâng cấp
 
 #### 1. Nâng cấp Kênh Thị giác (Visual Search)
-* **Vấn đề hiện tại:** CLIP/SigLIP mã hóa từng keyframe độc lập, đôi khi bỏ lỡ mối quan hệ hành động có tính chuyển động cao (ví dụ: *"đang rót nước"* vs *"đã rót xong"*).
-* **Giải pháp nâng cấp:**
-  * Sử dụng **`InternVideo2`** hoặc **`VideoLLaMA3`**: Trích xuất spatio-temporal feature cho từng đoạn video ngắn (shot 2-4 giây) thay vì ảnh tĩnh.
+* **Hiện trạng:** Đã nâng cấp lên **Google SigLIP 2** (`ViT-SO400M-14-SigLIP2-378`) mang lại độ chính xác zero-shot vượt trội so với SigLIP 1 và CLIP.
+* **Hướng nâng cấp tiếp theo:**
+  * Thử nghiệm **`InternVideo2`** hoặc **`VideoLLaMA3`**: Trích xuất spatio-temporal feature cho từng đoạn video ngắn (shot 2-4 giây) thay vì ảnh tĩnh.
   * Vector đặc trưng video được lưu dưới dạng `.npy` và tìm kiếm bằng FAISS IndexIVFFlat hoặc HNSW để đạt tốc độ $< 50\text{ms}$.
 
-#### 2. Nâng cấp Kênh Lời thoại ASR (Speech Transcript)
-* **Vấn đề hiện tại:** BM25 chỉ tìm được khi từ ngữ trong query xuất hiện chính xác trong lời thoại. Nếu người hỏi dùng từ đồng nghĩa hoặc mô tả gián tiếp, BM25 có thể bỏ sót.
-* **Giải pháp nâng cấp:**
+#### 2. Nâng cấp Thẩm định Thị giác (VLM-as-a-Judge)
+* **Hiện trạng:** Đã triển khai **Qwen2.5-VL-7B-Instruct** thẩm định Top 15 ứng viên cho KIS, QA Evidence và TRAKE Sequence.
+* **Hướng nâng cấp tiếp theo:**
+  * Bổ sung cơ chế **Region of Interest (RoI) Zooming**: Khi câu hỏi nhắm vào chi tiết nhỏ (ví dụ: *"chữ trên cổ áo"*, *"màu sắc chiếc nhẫn"*), VLM Judge tự động crop các vùng candidate có độ phân giải cao để thẩm định chính xác hơn.
+
+#### 3. Nâng cấp Kênh Lời thoại ASR (Speech Transcript)
+* **Hiện trạng:** BM25Okapi + Tokenizer Tiếng Việt nâng cao (NFC, Bigram, Accent-folding) đã hoạt động rất nhanh ($< 5\text{ms}$).
+* **Hướng nâng cấp tiếp theo:**
   * Xây dựng **Dense Speech Vector Index** bằng `BGE-M3` (đa ngữ, tối ưu cho tiếng Việt).
   * Khi tìm kiếm ASR: Tính điểm kết hợp $\text{Score}_{\text{ASR}} = 0.5 \cdot \text{Dense}(\text{BGE-M3}) + 0.5 \cdot \text{Sparse}(\text{BM25})$.
 
-#### 3. Nâng cấp Kênh Chữ màn hình & Biển hiệu (OCR)
-* **Vấn đề hiện tại:** Chữ trên áo, logo nhỏ hoặc biển hiệu bị che khuất một phần có thể bị bỏ qua bởi OCR truyền thống.
-* **Giải pháp nâng cấp:**
+#### 4. Nâng cấp Kênh Chữ màn hình & Biển hiệu (OCR)
+* **Hiện trạng:** PaddleOCR + BM25 Lexical Index.
+* **Hướng nâng cấp tiếp theo:**
   * Tích hợp **`GOT-OCR2.0`** (General OCR Theory) có khả năng đọc văn bản siêu nhỏ, định dạng phức tạp và chữ viết tay với độ chính xác cao hơn 30% so với PaddleOCR.
   * Bổ sung cơ chế **Fuzzy String Matching** (Levenshtein Distance / Token Set Ratio) trong `bm25_index.py` để vẫn bắt trúng kết quả khi OCR bị sai dấu hoặc thiếu chữ cái.
-
-#### 4. Nâng cấp Khâu Xếp hạng Đa kênh (Cross-Modal Reranking)
-* **Vấn đề hiện tại:** RRF (Reciprocal Rank Fusion) kết hợp thứ hạng theo công thức tĩnh $\frac{1}{k + r}$.
-* **Giải pháp nâng cấp:**
-  * Sau khi lấy ra Top 100 candidate bằng Vector + BM25, đưa Top 100 vào một mô hình **Cross-Encoder Reranker** đa phương thức để tính toán điểm tương thích tương tác sâu (Deep Late-Interaction) trước khi hiển thị lên Web UI.
 
