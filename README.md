@@ -63,40 +63,38 @@ uv pip install --reinstall-package torch torchvision --extra-index-url https://d
 ## 2. Cấu trúc thư mục Dữ liệu tách riêng
 
 > [!NOTE]
-> **Toàn bộ thư mục dữ liệu (`raw` và `processed`) được lưu riêng biệt ngoài `my-repo`** (ví dụ tại `D:\aichallenge_data\` hoặc bất kỳ ổ đĩa nào) để tránh nặng repo và tiện quản lý.
+> **Toàn bộ thư mục dữ liệu (`extracted` và `processed`) được lưu riêng biệt ngoài `my-repo`** tại `D:\bachkhoa\ai_challenge\data\` để tránh nặng repo và tiện quản lý.
 
 Sơ đồ cấu trúc thư mục data bên ngoài:
 
 ```text
-D:\aichallenge_data\ (Thư mục dữ liệu bên ngoài)
-├── raw/                              # Dữ liệu giải nén do BTC cung cấp
-│   ├── Keyframes/                    # Thư mục ảnh keyframe (L21_V001/001.jpg, ...)
-│   ├── map-keyframes/                # File CSV ánh xạ frame_idx gốc
-│   ├── Objects/                      # File JSON nhãn vật thể Faster R-CNN
-│   ├── Metadata/                     # File JSON thông tin video YouTube
-│   ├── CLIP features/                # (Tùy chọn) File .npy CLIP gốc của BTC
-│   └── Videos/                       # (Tùy chọn) File video .mp4 gốc
-└── processed/                        # Dữ liệu index đã xử lý (đầu ra của hệ thống)
-    ├── siglip_manifest.jsonl         # Manifest chính (vector_id, frame_id, labels, asr_text)
-    ├── siglip_features.npy           # Ma trận vector đặc trưng tương ứng
-    ├── colour_features.jsonl         # Đặc trưng màu sắc (tùy chọn)
-    └── asr/                          # Lời thoại JSON theo timestamp từng video
+D:\bachkhoa\ai_challenge\data\ (Thư mục dữ liệu bên ngoài)
+├── extracted/                            # Dữ liệu giải nén do BTC cung cấp
+│   ├── Keyframes/                        # Thư mục ảnh keyframe (L21_V001/001.jpg, ...)
+│   ├── map-keyframes/                    # File CSV ánh xạ frame_idx sang timestamp pts_time
+│   ├── asr/                              # File JSON lời thoại ASR từng video (L21_V001.json, ...)
+│   ├── Objects/                          # File JSON nhãn vật thể Faster R-CNN
+│   ├── Metadata/                         # File JSON thông tin video YouTube
+│   ├── clip_features/                    # (Tùy chọn) File .npy CLIP gốc của BTC
+│   └── Videos/                           # (Tùy chọn) File video .mp4 gốc
+└── processed/                            # Dữ liệu index đã xử lý (đầu ra của hệ thống)
+    ├── siglip_manifest.jsonl             # Manifest chính (vector_id, frame_id, labels, asr_text)
+    ├── siglip_features.npy               # Ma trận vector đặc trưng tương ứng
+    └── colour_features.jsonl             # Đặc trưng màu sắc (tùy chọn)
 ```
 
 ---
 
-## 3. Chuẩn bị dữ liệu & Index (Chỉ định đường dẫn ngoài)
-
-*(Thay thế `D:\aichallenge_data` bằng đường dẫn thực tế trên máy bạn)*
+## 3. Chuẩn bị dữ liệu & Index
 
 ### 3.1. Tự Encode Keyframes bằng GPU (Mô hình SigLIP mặc định)
 ```powershell
 python -m aic2026.cli embed-keyframes `
-  --keyframes-dir "D:\aichallenge_data\raw\Keyframes" `
-  --map-keyframes-dir "D:\aichallenge_data\raw\map-keyframes" `
-  --features-dir "D:\aichallenge_data\processed\siglip_features_dir" `
-  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
-  --features "D:\aichallenge_data\processed\siglip_features.npy" `
+  --keyframes-dir "D:\bachkhoa\ai_challenge\data\extracted\Keyframes" `
+  --map-keyframes-dir "D:\bachkhoa\ai_challenge\data\extracted\map-keyframes" `
+  --features-dir "D:\bachkhoa\ai_challenge\data\processed\siglip_features_dir" `
+  --manifest "D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl" `
+  --features "D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy" `
   --clip-model "ViT-SO400M-14-SigLIP-384" `
   --clip-pretrained "webli" `
   --device cuda `
@@ -107,21 +105,22 @@ python -m aic2026.cli embed-keyframes `
 ### 3.2. Ánh xạ lời thoại ASR vào Manifest
 ```powershell
 python -m aic2026.cli asr-manifest `
-  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
-  --asr-dir "D:\aichallenge_data\processed\asr"
+  --manifest "D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl" `
+  --asr-dir "D:\bachkhoa\ai_challenge\data\extracted\asr" `
+  --map-keyframes-dir "D:\bachkhoa\ai_challenge\data\extracted\map-keyframes"
 ```
 
 ### 3.3. Tiền trích xuất đặc trưng màu sắc (Tùy chọn)
 ```powershell
 python -m aic2026.cli compute-colour-features `
-  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
-  --raw-dir "D:\aichallenge_data\raw" `
-  --output "D:\aichallenge_data\processed\colour_features.jsonl"
+  --manifest "D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl" `
+  --raw-dir "D:\bachkhoa\ai_challenge\data\extracted" `
+  --output "D:\bachkhoa\ai_challenge\data\processed\colour_features.jsonl"
 ```
 
 ### 3.4. Kiểm tra tính đồng bộ của Index
 ```powershell
-python -m aic2026.cli check-features "D:\aichallenge_data\processed\siglip_features.npy" "D:\aichallenge_data\processed\siglip_manifest.jsonl"
+python -m aic2026.cli check-features "D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy" "D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl"
 ```
 
 ---
@@ -133,16 +132,13 @@ python -m aic2026.cli check-features "D:\aichallenge_data\processed\siglip_featu
 * **Cách 2 (Terminal):** `streamlit run src/aic2026/app/ui.py`
 * **Cách 3 (Backend API + UI):** Terminal 1: `python -m aic2026.cli serve` | Terminal 2: `streamlit run src/aic2026/app/ui.py`
 
-### ⚙️ Cấu hình đường dẫn Data ngoài trên Web UI:
-Trên thanh bên trái (Sidebar) của Web UI:
-1. Mở rộng mục **"Cấu hình nâng cao"** (hoặc Advanced Settings).
-2. Điền đường dẫn tới thư mục data ngoài của bạn:
-   * **Manifest Path:** `D:\aichallenge_data\processed\siglip_manifest.jsonl`
-   * **Features Path:** `D:\aichallenge_data\processed\siglip_features.npy`
-   * **Keyframes Dir:** `D:\aichallenge_data\raw\Keyframes`
-   * **Map Keyframes Dir:** `D:\aichallenge_data\raw\map-keyframes`
-   * **Videos Dir:** `D:\aichallenge_data\raw\Videos` (nếu có)
-3. Giao diện sẽ tự động lưu và kết nối với dữ liệu ngoài.
+### ⚙️ Đường dẫn Data mặc định tự động nhận diện:
+Giao diện đã được cấu hình tự động nhận diện chính xác các đường dẫn trên máy bạn:
+* **Manifest Path:** `D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl`
+* **Features Path:** `D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy`
+* **Keyframes Dir:** `D:\bachkhoa\ai_challenge\data\extracted\Keyframes`
+* **Map Keyframes Dir:** `D:\bachkhoa\ai_challenge\data\extracted\map-keyframes`
+* **Videos Dir:** `D:\bachkhoa\ai_challenge\data\extracted\Videos` (nếu có)
 
 ---
 
@@ -187,8 +183,8 @@ Thực thi tìm kiếm (`--mode` có thể chọn `hybrid`, `siglip`, `asr`, `oc
 # 1. Tìm kiếm -> JSON (ví dụ tìm thuần theo lời thoại ASR)
 python -m aic2026.cli agent-query `
   --query query_kis.json `
-  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
-  --features "D:\aichallenge_data\processed\siglip_features.npy" `
+  --manifest "D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl" `
+  --features "D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy" `
   --mode asr `
   --output outputs/result_kis.json
 
@@ -215,8 +211,8 @@ Xuất kết quả TRAKE (kết quả CSV chứa `video_id,f1,f2,f3` theo thứ 
 ```powershell
 python -m aic2026.cli agent-query `
   --query query_trake.json `
-  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
-  --features "D:\aichallenge_data\processed\siglip_features.npy" `
+  --manifest "D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl" `
+  --features "D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy" `
   --output outputs/result_trake.json
 
 python -m aic2026.cli export-submission --result outputs/result_trake.json --query query_trake.json --output outputs/submission_trake.csv
@@ -240,5 +236,5 @@ python -m aic2026.cli evaluate query_kis.json outputs/candidates_kis.json ground
 | **`activate.ps1 cannot be loaded...`** | PowerShell chặn script thực thi. | Chạy lệnh: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process` |
 | **`CUDA Available: False`** | Chưa cài bản PyTorch có CUDA. | Chạy: `uv pip install --reinstall-package torch torchvision --extra-index-url https://download.pytorch.org/whl/cu124` |
 | **Lỗi OpenMP `libiomp5md.dll`** | Trùng thư viện runtime giữa PyTorch và các gói khác trên Windows. | Trong PowerShell chạy: `$env:KMP_DUPLICATE_LIB_OK="TRUE"` trước khi chạy lệnh. |
-| **Ảnh không hiển thị trên Web UI** | Đường dẫn `Keyframes Dir` trỏ chưa đúng thư mục data bên ngoài. | Vào mục **Cấu hình nâng cao** trên Sidebar của Web UI, chỉnh lại đường dẫn `Keyframes Dir` trỏ đến thư mục chứa ảnh (vd: `D:\aichallenge_data\raw\Keyframes`). |
+| **Ảnh không hiển thị trên Web UI** | Đường dẫn `Keyframes Dir` trỏ chưa đúng thư mục data bên ngoài. | Vào mục **Cấu hình nâng cao** trên Sidebar của Web UI, kiểm tra lại đường dẫn `Keyframes Dir` (`D:\bachkhoa\ai_challenge\data\extracted\Keyframes`). |
 | **Chạy kiểm thử toàn bộ hệ thống** | Kiểm tra tính ổn định của mã nguồn. | Chạy lệnh: `pytest` |

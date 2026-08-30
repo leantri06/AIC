@@ -7,6 +7,9 @@ from .manifest import build_manifest, load_manifest
 
 __all__ = ["build_manifest", "enrich_manifest_with_asr", "load_manifest", "resolve_feature_sources"]
 
+LOCAL_SIGLIP_MANIFEST = Path(r"D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl")
+LOCAL_SIGLIP_FEATURES = Path(r"D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy")
+
 SIGLIP_MANIFEST = Path("data/processed/siglip_manifest.jsonl")
 SIGLIP_FEATURES = Path("data/processed/siglip_features.npy")
 
@@ -29,11 +32,18 @@ def resolve_feature_sources(
     if manifest_path is not None and features_path is not None:
         m = Path(manifest_path)
         f = Path(features_path)
+        if not m.exists() and LOCAL_SIGLIP_MANIFEST.exists() and m.name == LOCAL_SIGLIP_MANIFEST.name:
+            m = LOCAL_SIGLIP_MANIFEST
+        if not f.exists() and LOCAL_SIGLIP_FEATURES.exists() and f.name == LOCAL_SIGLIP_FEATURES.name:
+            f = LOCAL_SIGLIP_FEATURES
         if not m.exists() and ALT_DERIVED_MANIFEST.exists() and m.name == ALT_DERIVED_MANIFEST.name:
             m = ALT_DERIVED_MANIFEST
         if not f.exists() and ALT_DERIVED_FEATURES.exists() and f.name == ALT_DERIVED_FEATURES.name:
             f = ALT_DERIVED_FEATURES
         return m, f
+
+    if LOCAL_SIGLIP_MANIFEST.exists() and LOCAL_SIGLIP_FEATURES.exists():
+        return LOCAL_SIGLIP_MANIFEST, LOCAL_SIGLIP_FEATURES
 
     if SIGLIP_MANIFEST.exists() and SIGLIP_FEATURES.exists():
         return SIGLIP_MANIFEST, SIGLIP_FEATURES
@@ -47,4 +57,4 @@ def resolve_feature_sources(
     if ALT_DERIVED_MANIFEST.exists() and ALT_DERIVED_FEATURES.exists():
         return ALT_DERIVED_MANIFEST, ALT_DERIVED_FEATURES
 
-    return SIGLIP_MANIFEST, SIGLIP_FEATURES
+    return LOCAL_SIGLIP_MANIFEST if LOCAL_SIGLIP_MANIFEST.exists() else SIGLIP_MANIFEST, LOCAL_SIGLIP_FEATURES if LOCAL_SIGLIP_FEATURES.exists() else SIGLIP_FEATURES

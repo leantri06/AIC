@@ -29,6 +29,8 @@ def resolve_keyframe_path(keyframe_path: str | Path | None) -> Path | None:
     root = Path.cwd()
     for rel in rel_candidates:
         for probe in (
+            Path(r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes") / rel,
+            Path(r"D:\bachkhoa\ai_challenge\data\extracted") / rel,
             Path(r"D:\aichallenge\data\extracted\Keyframes") / rel,
             Path(r"D:\aichallenge\data\extracted") / rel,
             Path(r"D:\aichallenge\data\raw\Keyframes") / rel,
