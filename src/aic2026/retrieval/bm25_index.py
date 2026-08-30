@@ -144,21 +144,26 @@ class BM25Index:
             corpus_asr.append(_tokenize(" ".join(asr_texts)))
 
         self._size = len(corpus)
-        if not any(corpus):
+        has_corpus = any(corpus)
+        has_ocr = any(corpus_ocr)
+        has_asr = any(corpus_asr)
+
+        if not has_corpus and not has_ocr and not has_asr:
             self._bm25 = None
             self._bm25_ocr = None
             self._bm25_asr = None
             self._empty = True
             return
 
-        self._bm25 = BM25Okapi(corpus)
-        self._apply_idf_floor(self._bm25)
+        self._bm25 = BM25Okapi(corpus) if has_corpus else None
+        if self._bm25 is not None:
+            self._apply_idf_floor(self._bm25)
 
-        self._bm25_ocr = BM25Okapi(corpus_ocr) if any(corpus_ocr) else None
+        self._bm25_ocr = BM25Okapi(corpus_ocr) if has_ocr else None
         if self._bm25_ocr is not None:
             self._apply_idf_floor(self._bm25_ocr)
 
-        self._bm25_asr = BM25Okapi(corpus_asr) if any(corpus_asr) else None
+        self._bm25_asr = BM25Okapi(corpus_asr) if has_asr else None
         if self._bm25_asr is not None:
             self._apply_idf_floor(self._bm25_asr)
 

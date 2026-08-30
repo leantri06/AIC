@@ -6,6 +6,10 @@ import os
 import sys
 from pathlib import Path
 
+# Fix OpenMP duplicate lib runtime conflict on Windows (Error #15 / 0xC0000005)
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+
 # Windows console defaults to a legacy code page (cp1252) that cannot encode
 # Vietnamese (or any non-Latin) output, which makes every `typer.echo` of a
 # progress message crash with UnicodeEncodeError. Force UTF-8 on the std
