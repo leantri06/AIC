@@ -73,7 +73,7 @@ class RuntimeConfig(BaseModel):
     metadata_filter: str = ""
     translate_query: bool = False
     search_mode: str = "hybrid"
-    vlm_backend: str = "florence"
+    vlm_backend: str = "none"
     vlm_model: str = "microsoft/Florence-2-base-ft"
     vlm_device: str | None = None
     vlm_dtype: str = "float32"
