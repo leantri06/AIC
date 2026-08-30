@@ -83,7 +83,7 @@ DEFAULT_MAP_KEYFRAMES = _detect_default_path([
     "data/extracted/map-keyframes",
     "data/raw/map-keyframes",
 ])
-DEFAULT_CLIP_MODEL = "ViT-SO400M-14-SigLIP-384"
+DEFAULT_CLIP_MODEL = "siglip2" if "siglip2" in DEFAULT_FEATURES else "ViT-SO400M-14-SigLIP-384"
 DEFAULT_CLIP_PRETRAINED = "webli"
 
 
