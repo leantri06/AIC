@@ -1297,7 +1297,7 @@ with st.expander("Cấu hình nâng cao"):
     st.markdown("---")
     st.checkbox("⚖️ Kích hoạt VLM-as-a-Judge (Qwen2.5-VL)", value=False, key="cfg_vlm_judge",
                 help="Thẩm định chi tiết Top 15 ứng viên: phân tích chi tiết vật thể/màu sắc KIS, bằng chứng thị giác QA, và chuỗi sự kiện thời gian TRAKE.")
-    st.text_input("VLM Judge Model", "Qwen/Qwen2.5-VL-7B-Instruct", key="cfg_vlm_judge_model", help="Qwen/Qwen2.5-VL-7B-Instruct, Qwen/Qwen2.5-VL-3B-Instruct hoặc Ollama model")
+    st.text_input("VLM Judge Model", "Qwen/Qwen2.5-VL-3B-Instruct", key="cfg_vlm_judge_model", help="Qwen/Qwen2.5-VL-3B-Instruct (Khuyên dùng cho 12GB VRAM - cực nhanh và nhẹ), Qwen/Qwen2.5-VL-7B-Instruct, hoặc Ollama model (qwen2.5vl:7b)")
     st.selectbox("VLM Judge Backend", ["qwen", "ollama", "mock"], index=0, key="cfg_vlm_judge_backend")
     st.number_input("VLM Judge: Số ứng viên thẩm định (Top-K)", min_value=1, max_value=50, value=15, key="cfg_vlm_judge_top_k")
 

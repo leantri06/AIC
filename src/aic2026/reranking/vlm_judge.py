@@ -101,7 +101,7 @@ class VLMJudge:
                 self._loaded = False
                 return
 
-        dtype = getattr(torch, self.torch_dtype, torch.bfloat16)
+        dtype = getattr(torch, self.torch_dtype, torch.bfloat16) if isinstance(self.torch_dtype, str) else self.torch_dtype
         try:
             logger.info("VLMJudge: loading processor and model %s", self.model_name)
             self._processor = AutoProcessor.from_pretrained(self.model_name)
@@ -110,6 +110,7 @@ class VLMJudge:
                 self.model_name,
                 torch_dtype=dtype,
                 device_map=device_map,
+                low_cpu_mem_usage=True,
             )
             self._model.eval()
             self._torch = torch
