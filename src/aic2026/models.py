@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -50,6 +51,7 @@ class Candidate(BaseModel):
     keyframe_path: str | None = None
     answer: str | None = None
     event_frames: list[int] | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class Query(BaseModel):

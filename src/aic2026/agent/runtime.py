@@ -274,6 +274,18 @@ class RetrievalAgent:
                 ),
             )
 
+            if getattr(self.tools, "vlm_judge_enabled", False):
+                candidates = self.tools.rerank_with_vlm_judge(candidates, query)
+                trace.append(
+                    AgentTrace(
+                        step="vlm_judge_trake",
+                        detail=(
+                            f"VLM Judge ({getattr(self.tools, 'vlm_judge_model', 'Qwen2.5-VL')}) "
+                            f"verified multi-event sequence over top {getattr(self.tools, 'vlm_judge_top_k', 10)} candidate trajectories."
+                        ),
+                    )
+                )
+
             trace.append(
                 AgentTrace(
                     step="trake_align",
@@ -310,6 +322,19 @@ class RetrievalAgent:
         )
 
         ranked = self._deduplicate_best(found)
+
+        if getattr(self.tools, "vlm_judge_enabled", False):
+            ranked = self.tools.rerank_with_vlm_judge(ranked, query)
+            judge_type = "Visual Evidence Verification" if query.type == "qa" else "Fine-grained Condition Verification"
+            trace.append(
+                AgentTrace(
+                    step="vlm_judge",
+                    detail=(
+                        f"VLM Judge ({getattr(self.tools, 'vlm_judge_model', 'Qwen2.5-VL')}) [{judge_type}] "
+                        f"reranked top {getattr(self.tools, 'vlm_judge_top_k', 15)} candidates."
+                    ),
+                )
+            )
 
         # The retrieval pool already carries the final blended score (RRF fusion
         # + bounded metadata keyword bonus). We deliberately do NOT apply any

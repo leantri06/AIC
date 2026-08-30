@@ -7,8 +7,14 @@ from .manifest import build_manifest, load_manifest
 
 __all__ = ["build_manifest", "enrich_manifest_with_asr", "load_manifest", "resolve_feature_sources"]
 
-LOCAL_SIGLIP_MANIFEST = Path(r"D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl")
-LOCAL_SIGLIP_FEATURES = Path(r"D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy")
+LOCAL_SIGLIP2_MANIFEST = Path(r"D:\ai_challenge\data\processed\siglip2_manifest.jsonl")
+LOCAL_SIGLIP2_FEATURES = Path(r"D:\ai_challenge\data\processed\siglip2_features.npy")
+
+LOCAL_SIGLIP_MANIFEST = Path(r"D:\ai_challenge\data\processed\siglip_manifest.jsonl")
+LOCAL_SIGLIP_FEATURES = Path(r"D:\ai_challenge\data\processed\siglip_features.npy")
+
+LOCAL_DERIVED_MANIFEST = Path(r"D:\ai_challenge\data\processed\derived_manifest.jsonl")
+LOCAL_DERIVED_FEATURES = Path(r"D:\ai_challenge\data\processed\derived_features.npy")
 
 SIGLIP_MANIFEST = Path("data/processed/siglip_manifest.jsonl")
 SIGLIP_FEATURES = Path("data/processed/siglip_features.npy")
@@ -18,9 +24,6 @@ OFFICIAL_FEATURES = Path("data/processed/official_features.npy")
 
 DERIVED_MANIFEST = Path("data/processed/derived_manifest.jsonl")
 DERIVED_FEATURES = Path("data/processed/derived_features.npy")
-
-ALT_DERIVED_MANIFEST = Path(r"D:\aichallenge\data\processed\derived_manifest.jsonl")
-ALT_DERIVED_FEATURES = Path(r"D:\aichallenge\data\processed\derived_features.npy")
 
 
 def resolve_feature_sources(
@@ -32,18 +35,26 @@ def resolve_feature_sources(
     if manifest_path is not None and features_path is not None:
         m = Path(manifest_path)
         f = Path(features_path)
-        if not m.exists() and LOCAL_SIGLIP_MANIFEST.exists() and m.name == LOCAL_SIGLIP_MANIFEST.name:
-            m = LOCAL_SIGLIP_MANIFEST
-        if not f.exists() and LOCAL_SIGLIP_FEATURES.exists() and f.name == LOCAL_SIGLIP_FEATURES.name:
-            f = LOCAL_SIGLIP_FEATURES
-        if not m.exists() and ALT_DERIVED_MANIFEST.exists() and m.name == ALT_DERIVED_MANIFEST.name:
-            m = ALT_DERIVED_MANIFEST
-        if not f.exists() and ALT_DERIVED_FEATURES.exists() and f.name == ALT_DERIVED_FEATURES.name:
-            f = ALT_DERIVED_FEATURES
+        if not m.exists():
+            for cand_m in (LOCAL_SIGLIP2_MANIFEST, LOCAL_SIGLIP_MANIFEST, LOCAL_DERIVED_MANIFEST):
+                if cand_m.exists() and m.name == cand_m.name:
+                    m = cand_m
+                    break
+        if not f.exists():
+            for cand_f in (LOCAL_SIGLIP2_FEATURES, LOCAL_SIGLIP_FEATURES, LOCAL_DERIVED_FEATURES):
+                if cand_f.exists() and f.name == cand_f.name:
+                    f = cand_f
+                    break
         return m, f
+
+    if LOCAL_SIGLIP2_MANIFEST.exists() and LOCAL_SIGLIP2_FEATURES.exists():
+        return LOCAL_SIGLIP2_MANIFEST, LOCAL_SIGLIP2_FEATURES
 
     if LOCAL_SIGLIP_MANIFEST.exists() and LOCAL_SIGLIP_FEATURES.exists():
         return LOCAL_SIGLIP_MANIFEST, LOCAL_SIGLIP_FEATURES
+
+    if LOCAL_DERIVED_MANIFEST.exists() and LOCAL_DERIVED_FEATURES.exists():
+        return LOCAL_DERIVED_MANIFEST, LOCAL_DERIVED_FEATURES
 
     if SIGLIP_MANIFEST.exists() and SIGLIP_FEATURES.exists():
         return SIGLIP_MANIFEST, SIGLIP_FEATURES
@@ -54,7 +65,4 @@ def resolve_feature_sources(
     if DERIVED_MANIFEST.exists() and DERIVED_FEATURES.exists():
         return DERIVED_MANIFEST, DERIVED_FEATURES
 
-    if ALT_DERIVED_MANIFEST.exists() and ALT_DERIVED_FEATURES.exists():
-        return ALT_DERIVED_MANIFEST, ALT_DERIVED_FEATURES
-
-    return LOCAL_SIGLIP_MANIFEST if LOCAL_SIGLIP_MANIFEST.exists() else SIGLIP_MANIFEST, LOCAL_SIGLIP_FEATURES if LOCAL_SIGLIP_FEATURES.exists() else SIGLIP_FEATURES
+    return LOCAL_DERIVED_MANIFEST if LOCAL_DERIVED_MANIFEST.exists() else DERIVED_MANIFEST, LOCAL_DERIVED_FEATURES if LOCAL_DERIVED_FEATURES.exists() else DERIVED_FEATURES

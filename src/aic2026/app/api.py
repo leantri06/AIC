@@ -75,10 +75,12 @@ class RuntimeConfig(BaseModel):
     search_mode: str = "hybrid"
     vlm_backend: str = "none"
     vlm_model: str = "microsoft/Florence-2-base-ft"
-    vlm_device: str | None = None
-    vlm_dtype: str = "float32"
     vlm_timeout: int = 120
     coarse_top_k: int = 200
+    vlm_judge_enabled: bool = False
+    vlm_judge_model: str = "Qwen/Qwen2.5-VL-7B-Instruct"
+    vlm_judge_backend: str = "qwen"
+    vlm_judge_top_k: int = 15
     # Số video gửi VLM tối đa (top-N video score cao nhất). 0 = tất cả.
     # Giới hạn này giúp giảm thời gian VLM khi có nhiều candidate video.
     vlm_top_videos: int = 20
@@ -122,6 +124,10 @@ def load_orchestrator(
     coarse_top_k: int = 200,
     query_type: str | None = None,
     clip_model: str = "ViT-SO400M-14-SigLIP-384",
+    vlm_judge_enabled: bool = False,
+    vlm_judge_model: str = "Qwen/Qwen2.5-VL-7B-Instruct",
+    vlm_judge_backend: str = "qwen",
+    vlm_judge_top_k: int = 15,
 ):
     """Shared layer: index + encoders load once per runtime configuration."""
     from aic2026.agent import OllamaLLM, RetrievalAgent
@@ -182,6 +188,11 @@ def load_orchestrator(
         tools.vlm_model = vlm_model
         tools.vlm_device = vlm_device
         tools.vlm_dtype = vlm_dtype
+    if vlm_judge_enabled:
+        tools.vlm_judge_enabled = True
+        tools.vlm_judge_model = vlm_judge_model
+        tools.vlm_judge_backend = vlm_judge_backend
+        tools.vlm_judge_top_k = vlm_judge_top_k
     agent = RetrievalAgent(
         tools,
         llm=OllamaLLM(
@@ -218,12 +229,16 @@ def run_task(task_type: str, request: TaskRequest) -> AgentResult:
             translate_query=config.translate_query,
             vlm_backend=config.vlm_backend,
             vlm_model=config.vlm_model,
-            vlm_device=config.vlm_device,
-            vlm_dtype=config.vlm_dtype,
+            vlm_device=getattr(config, "vlm_device", None),
+            vlm_dtype=getattr(config, "vlm_dtype", "float32"),
             vlm_timeout=config.vlm_timeout,
             late_interaction_weight=config.late_interaction_weight,
             query_type=task_type,
             clip_model=config.clip_model,
+            vlm_judge_enabled=config.vlm_judge_enabled,
+            vlm_judge_model=config.vlm_judge_model,
+            vlm_judge_backend=config.vlm_judge_backend,
+            vlm_judge_top_k=config.vlm_judge_top_k,
         )
         orchestrator.search_mode = config.search_mode
         return orchestrator.run(Query(query_id=request.query_id, type=task_type, text=request.text, question=request.question, events=request.events))

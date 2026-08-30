@@ -125,7 +125,7 @@ def embed_keyframes(
     features_dir: Path = typer.Option(Path("data/processed/clip_features"), help="Thư mục output để ghi .npz/.npy embedding tự tạo (không phải thư mục CLIP features BTC đầu vào)"),
     manifest: Path = typer.Option(Path("data/processed/derived_manifest.jsonl"), help="Manifest output ở processed"),
     features: Path = typer.Option(Path("data/processed/derived_features.npy"), help="Feature index output ở processed"),
-    clip_model: str = typer.Option("ViT-SO400M-14-SigLIP-384", help="Mô hình CLIP: ViT-SO400M-14-SigLIP-384, ViT-L-14, ViT-B-32, ViT-L-14-quickgelu, ViT-B-16-SigLIP"),
+    clip_model: str = typer.Option("ViT-SO400M-14-SigLIP2-378", help="Mô hình CLIP/SigLIP: ViT-SO400M-14-SigLIP2-378 (alias: siglip2), ViT-B-16-SigLIP2-384 (alias: siglip2-base), ViT-SO400M-14-SigLIP-384 (alias: siglip), ViT-L-14"),
     clip_pretrained: str = typer.Option("webli", help="Checkpoint: webli, openai, metaclip_fullcc, metaclip_400m, laion2b_s32b_b82k"),
     device: str = typer.Option("cuda", help="Thiết bị: cuda, cpu, hoặc auto"),
     batch_size: int = typer.Option(32, min=1, help="Số ảnh mỗi batch để encode trên GPU"),
@@ -782,8 +782,12 @@ def agent_query(
     trake_preferred_prefixes: str = typer.Option("", help="Ưu tiên (soft bias, KHÔNG loại trừ) TRAKE vào tiền tố video_id, cách nhau dấu phẩy (vd: L26). KIS/Q&A luôn xét TOÀN BỘ video. Để trống = mặc định ưu tiên L26. Truyền '.' để tắt ưu tiên."),
     translate: bool = typer.Option(False, help="Dịch VI→EN trước khi retrieval (CLIP là tiếng Anh). Mặc định tắt: dùng query nguyên bản."),
     search_mode: str = typer.Option("hybrid", "--mode", "-m", help="Chế độ tìm kiếm: hybrid (mặc định), siglip, asr, ocr"),
-    clip_model: str = typer.Option("ViT-SO400M-14-SigLIP-384", help="Mô hình CLIP (ViT-SO400M-14-SigLIP-384, ViT-L-14, ViT-B-32, ViT-L-14-quickgelu, ViT-B-16-SigLIP)"),
+    clip_model: str = typer.Option("ViT-SO400M-14-SigLIP-384", help="Mô hình CLIP/SigLIP (ViT-SO400M-14-SigLIP2-378 / siglip2, ViT-SO400M-14-SigLIP-384 / siglip, ViT-B-16-SigLIP2-384 / siglip2-base, ViT-L-14)"),
     clip_pretrained: str = typer.Option("webli", help="Checkpoint (webli, openai, metaclip_fullcc, metaclip_400m, laion2b_s32b_b82k)"),
+    vlm_judge: bool = typer.Option(False, help="Kích hoạt VLM-as-a-Judge (Qwen2.5-VL) thẩm định thị giác chính xác cho KIS, QA và TRAKE"),
+    vlm_judge_model: str = typer.Option("Qwen/Qwen2.5-VL-7B-Instruct", help="Model VLM Judge: Qwen/Qwen2.5-VL-7B-Instruct, Qwen/Qwen2.5-VL-3B-Instruct, hoặc Ollama model"),
+    vlm_judge_backend: str = typer.Option("qwen", help="Backend VLM Judge: qwen (transformers CUDA/CPU), ollama, mock"),
+    vlm_judge_top_k: int = typer.Option(15, help="Số lượng ứng viên hàng đầu được VLM Judge thẩm định chi tiết"),
     output: Path | None = typer.Option(None),
 ) -> None:
     """Run the bounded local-LLM agent and save auditable candidates/trace."""
@@ -851,6 +855,11 @@ def agent_query(
         tools.vlm_model = vlm_model
         tools.vlm_device = vlm_device
         tools.vlm_dtype = vlm_dtype
+    if vlm_judge:
+        tools.vlm_judge_enabled = True
+        tools.vlm_judge_model = vlm_judge_model
+        tools.vlm_judge_backend = vlm_judge_backend
+        tools.vlm_judge_top_k = vlm_judge_top_k
     agent = RetrievalAgent(
         tools,
         llm=OllamaLLM(model=llm_model, base_url=ollama_url, timeout_seconds=llm_timeout),

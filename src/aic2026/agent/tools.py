@@ -57,6 +57,13 @@ class RetrievalTools:
     vlm_model: str | None = None
     vlm_device: str | None = None
     vlm_dtype: str = "float32"
+    # VLM Judge configuration (for high-precision visual verification in KIS, QA, TRAKE)
+    vlm_judge_enabled: bool = False
+    vlm_judge_model: str = "Qwen/Qwen2.5-VL-7B-Instruct"
+    vlm_judge_backend: str = "qwen"
+    vlm_judge_top_k: int = 15
+    vlm_judge_weight: float = 0.5
+    vlm_judge_obj: Any | None = None
     encode_images: Callable[[list[object]], np.ndarray] | None = None
     bm25_index: BM25Index | None = None
     # Trọng số metadata bonus (Direction B): nhỏ, cộng trực tiếp lên RRF gốc
@@ -605,6 +612,52 @@ class RetrievalTools:
                 obj.close()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("close_vlm: close failed: %s", exc)
+
+    def ensure_vlm_judge(self) -> Any | None:
+        """Lazily initialize the VLM Judge instance."""
+        if self.vlm_judge_obj is not None:
+            return self.vlm_judge_obj
+        if not self.vlm_judge_enabled:
+            return None
+        try:
+            from aic2026.reranking.vlm_judge import VLMJudge
+            self.vlm_judge_obj = VLMJudge(
+                model_name=self.vlm_judge_model,
+                backend=self.vlm_judge_backend,
+                device=self.vlm_device,
+            )
+            return self.vlm_judge_obj
+        except Exception as exc:
+            logger.warning("ensure_vlm_judge: failed to initialize VLMJudge: %s", exc)
+            return None
+
+    def close_vlm_judge(self) -> None:
+        """Free VLM Judge GPU memory."""
+        if self.vlm_judge_obj is not None and hasattr(self.vlm_judge_obj, "close"):
+            try:
+                self.vlm_judge_obj.close()
+            except Exception as exc:
+                logger.warning("close_vlm_judge: failed to close: %s", exc)
+
+    def rerank_with_vlm_judge(
+        self,
+        candidates: list[Candidate],
+        query: Any,
+        top_k: int | None = None,
+    ) -> list[Candidate]:
+        """Rerank candidates using VLM Judge precision scoring."""
+        if not self.vlm_judge_enabled or not candidates:
+            return candidates
+        judge = self.ensure_vlm_judge()
+        if judge is None:
+            return candidates
+        k = top_k if top_k is not None else self.vlm_judge_top_k
+        return judge.rerank_candidates(
+            candidates=candidates,
+            query=query,
+            top_k=k,
+            weight=self.vlm_judge_weight,
+        )
 
     @staticmethod
     def evidence(

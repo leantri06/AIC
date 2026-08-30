@@ -18,8 +18,37 @@ _DEFAULT_PROMPT_TEMPLATES = (
 )
 
 
+_MODEL_ALIASES: dict[str, tuple[str, str]] = {
+    # SigLIP 2 models
+    "siglip2": ("ViT-SO400M-14-SigLIP2-378", "webli"),
+    "siglip2-so400m": ("ViT-SO400M-14-SigLIP2-378", "webli"),
+    "siglip2-so400m-378": ("ViT-SO400M-14-SigLIP2-378", "webli"),
+    "siglip2-base": ("ViT-B-16-SigLIP2-384", "webli"),
+    "siglip2-large": ("ViT-L-16-SigLIP2-384", "webli"),
+    "google/siglip2-so400m-patch14-384": ("ViT-SO400M-14-SigLIP2-378", "webli"),
+    "google/siglip2-base-patch16-384": ("ViT-B-16-SigLIP2-384", "webli"),
+    # SigLIP 1 models
+    "siglip": ("ViT-SO400M-14-SigLIP-384", "webli"),
+    "siglip1": ("ViT-SO400M-14-SigLIP-384", "webli"),
+    "siglip-so400m": ("ViT-SO400M-14-SigLIP-384", "webli"),
+    "siglip-base": ("ViT-B-16-SigLIP-384", "webli"),
+    # Classic CLIP
+    "clip-l14": ("ViT-L-14", "openai"),
+    "clip-b32": ("ViT-B-32", "openai"),
+}
+
+
+def normalize_model_name(model_name: str, pretrained: str | None = None) -> tuple[str, str]:
+    """Resolve user-friendly model aliases (e.g. 'siglip2') into OpenCLIP (model, pretrained) pair."""
+    key = (model_name or "").strip().lower()
+    if key in _MODEL_ALIASES:
+        resolved_model, default_pre = _MODEL_ALIASES[key]
+        return resolved_model, pretrained if pretrained else default_pre
+    return model_name, pretrained or "webli"
+
+
 class OpenCLIPTextEmbedder:
-    """Text encoder matching CLIP features with multi-template prompt ensembling."""
+    """Text encoder matching CLIP/SigLIP/SigLIP 2 features with multi-template prompt ensembling."""
     def __init__(
         self,
         model_name: str = "ViT-SO400M-14-SigLIP-384",
@@ -32,15 +61,16 @@ class OpenCLIPTextEmbedder:
             import torch
         except ImportError as exc:
             raise RuntimeError("Install model extras: uv sync --extra models") from exc
-        self.model_name = model_name
-        self.pretrained = pretrained
+        resolved_name, resolved_pre = normalize_model_name(model_name, pretrained)
+        self.model_name = resolved_name
+        self.pretrained = resolved_pre
         self.torch = torch
         self.use_ensemble = use_ensemble
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(
-            model_name, pretrained=pretrained, device=self.device
+            self.model_name, pretrained=self.pretrained, device=self.device
         )
-        self.tokenizer = open_clip.get_tokenizer(model_name)
+        self.tokenizer = open_clip.get_tokenizer(self.model_name)
         self.model.eval()
 
     def encode(

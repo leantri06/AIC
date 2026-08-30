@@ -14,9 +14,12 @@ from .lexical import (
     rrf_fuse,
     rrf_rank,
 )
+from .vlm_judge import JudgeResult, VLMJudge
 
 __all__ = [
+    "JudgeResult",
     "RRF_K",
+    "VLMJudge",
     "colour_fraction",
     "contrastive_clip_colour_rerank",
     "facet_queries",

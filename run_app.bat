@@ -11,7 +11,7 @@ echo.
 set "PATH=%PATH%;E:\Anaconda3\Scripts;E:\Anaconda3;%USERPROFILE%\.cargo\bin"
 set "KMP_DUPLICATE_LIB_OK=TRUE"
 set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
-set "HF_HOME=D:\bachkhoa\ai_challenge\data\.cache\huggingface"
+set "HF_HOME=D:\ai_challenge\data\.cache\huggingface"
 set "PYTHONPATH=src;%PYTHONPATH%"
 
 :: 1. Uu tien dung uv run

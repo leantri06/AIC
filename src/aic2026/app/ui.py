@@ -5,8 +5,8 @@ import os
 # Fix OpenMP duplicate lib runtime conflict on Windows (Error #15 / 0xC0000005)
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-if os.path.exists(r"D:\bachkhoa\ai_challenge\data"):
-    os.environ.setdefault("HF_HOME", r"D:\bachkhoa\ai_challenge\data\.cache\huggingface")
+if os.path.exists(r"D:\ai_challenge\data"):
+    os.environ.setdefault("HF_HOME", r"D:\ai_challenge\data\.cache\huggingface")
 
 import csv
 import html
@@ -50,35 +50,36 @@ def _detect_default_path(candidates: list[str]) -> str:
 
 
 DEFAULT_MANIFEST = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl",
+    r"D:\ai_challenge\data\processed\siglip2_manifest.jsonl",
+    "data/processed/siglip2_manifest.jsonl",
+    r"D:\ai_challenge\data\processed\siglip_manifest.jsonl",
     "data/processed/siglip_manifest.jsonl",
-    r"D:\aichallenge\data\processed\siglip_manifest.jsonl",
+    r"D:\ai_challenge\data\processed\derived_manifest.jsonl",
     "data/processed/derived_manifest.jsonl",
     "data/processed/official_manifest.jsonl",
 ])
 DEFAULT_FEATURES = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy",
+    r"D:\ai_challenge\data\processed\siglip2_features.npy",
+    "data/processed/siglip2_features.npy",
+    r"D:\ai_challenge\data\processed\siglip_features.npy",
     "data/processed/siglip_features.npy",
-    r"D:\aichallenge\data\processed\siglip_features.npy",
+    r"D:\ai_challenge\data\processed\derived_features.npy",
     "data/processed/derived_features.npy",
     "data/processed/official_features.npy",
 ])
 DEFAULT_ROOT = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes",
-    r"D:\bachkhoa\ai_challenge\data\extracted",
-    r"D:\aichallenge\data\extracted\Keyframes",
+    r"D:\ai_challenge\data\extracted\Keyframes",
+    r"D:\ai_challenge\data\extracted",
     "data/raw/Keyframes",
     "data/processed",
 ])
 DEFAULT_VIDEOS_ROOT = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\extracted\Videos",
-    r"D:\aichallenge\data\extracted\Videos",
+    r"D:\ai_challenge\data\extracted\Videos",
     "data/extracted/Videos",
     "data/raw/Videos",
 ])
 DEFAULT_MAP_KEYFRAMES = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\extracted\map-keyframes",
-    r"D:\aichallenge\data\extracted\map-keyframes",
+    r"D:\ai_challenge\data\extracted\map-keyframes",
     "data/extracted/map-keyframes",
     "data/raw/map-keyframes",
 ])
@@ -455,11 +456,9 @@ def resolve_keyframe_path(stored_path: str, root: Path) -> Path:
         for candidate in (
             root / rel,
             root / "Keyframes" / rel,
-            Path(r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes") / rel,
-            Path(r"D:\bachkhoa\ai_challenge\data\extracted") / rel,
-            Path(r"D:\aichallenge\data\extracted\Keyframes") / rel,
-            Path(r"D:\aichallenge\data\extracted") / rel,
-            Path(r"D:\aichallenge\data\raw\Keyframes") / rel,
+            Path(r"D:\ai_challenge\data\extracted\Keyframes") / rel,
+            Path(r"D:\ai_challenge\data\extracted") / rel,
+            Path(r"D:\ai_challenge\data\raw\Keyframes") / rel,
             Path.cwd() / rel,
             Path.cwd() / "data" / "raw" / rel,
             Path.cwd() / "data" / "extracted" / "Keyframes" / rel,
@@ -485,10 +484,9 @@ def event_keyframe_file(video_id: str, frame_id: int, lookup: dict[tuple[str, in
     for base in (
         root,
         root / "Keyframes",
-        Path(r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes"),
-        Path(r"D:\bachkhoa\ai_challenge\data\extracted"),
-        Path(r"D:\aichallenge\data\extracted\Keyframes"),
-        Path(r"D:\aichallenge\data\extracted"),
+        Path(r"D:\ai_challenge\data\extracted\Keyframes"),
+        Path(r"D:\ai_challenge\data\extracted"),
+        Path(r"D:\ai_challenge\data\raw\Keyframes"),
         Path.cwd() / "data" / "raw" / "Keyframes",
     ):
         for pattern in (f"{frame_id:03d}.jpg", f"{frame_id:04d}.jpg", f"{frame_id}.jpg"):
@@ -541,9 +539,8 @@ def resolve_video_file(video_id: str, custom_root: str | Path | None = None) -> 
         roots.append(Path(custom_root))
     roots.extend([
         Path(DEFAULT_VIDEOS_ROOT),
-        Path(r"D:\bachkhoa\ai_challenge\data\extracted\Videos"),
-        Path(r"D:\aichallenge\data\extracted\Videos"),
-        Path(r"D:\aichallenge\data\raw\Videos"),
+        Path(r"D:\ai_challenge\data\extracted\Videos"),
+        Path(r"D:\ai_challenge\data\raw\Videos"),
         Path("data/extracted/Videos"),
         Path("data/raw/Videos"),
         Path("data/Videos"),
@@ -580,8 +577,8 @@ def get_single_video_pts_map(video_id: str, map_dir: str | Path | None = None) -
     roots = [
         Path(map_dir) if map_dir else Path(DEFAULT_MAP_KEYFRAMES),
         Path(DEFAULT_MAP_KEYFRAMES),
-        Path(r"D:\bachkhoa\ai_challenge\data\extracted\map-keyframes"),
-        Path(r"D:\aichallenge\data\extracted\map-keyframes"),
+        Path(r"D:\ai_challenge\data\extracted\map-keyframes"),
+        Path(r"D:\ai_challenge\data\raw\map-keyframes"),
         Path("data/extracted/map-keyframes"),
         Path("data/raw/map-keyframes"),
     ]
@@ -954,11 +951,25 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                     f'title="{html.escape(", ".join(ocr_labels))}">🔤 {html.escape(short_ocr)}</div>'
                 )
 
+            judge_score = item.metadata.get("vlm_judge_score") if item.metadata else None
+            judge_reason = item.metadata.get("vlm_judge_reason") if item.metadata else None
+            judge_html = ""
+            if judge_score is not None:
+                badge_bg = "#ecfdf5" if float(judge_score) >= 70 else "#fef3c7"
+                badge_color = "#065f46" if float(judge_score) >= 70 else "#92400e"
+                judge_label = "🎯 Bằng chứng QA" if query_type == "qa" else ("⏱️ Chuỗi TRAKE" if query_type == "trake" else "⚖️ VLM Judge")
+                judge_html = (
+                    f'<div style="font-size:0.73rem; font-weight:700; color:{badge_color}; background:{badge_bg}; '
+                    f'border-radius:4px; padding:2px 4px; margin-top:2px; line-height:1.2;" '
+                    f'title="{html.escape(str(judge_reason or ""))}">{judge_label}: {float(judge_score):.0f}/100</div>'
+                )
+
             st.markdown(
                 f'<div class="card-meta">'
                 f'<span class="card-rank">#{idx + 1}</span> '
                 f'<span class="card-video">{html.escape(item.video_id)}</span><br>'
                 f"frame <b>{item.frame_id}</b> · score {item.score:.3f}"
+                f"{judge_html}"
                 f"{ocr_html}"
                 f"{asr_html}</div>",
                 unsafe_allow_html=True,
@@ -1183,6 +1194,10 @@ if st.session_state.get("_run_agent"):
                     "translate_query": bool(st.session_state.get("cfg_translate", False)),
                     "search_mode": str(st.session_state.get("search_mode", "hybrid") or "hybrid"),
                     "coarse_top_k": int(st.session_state.get("cfg_coarse_top_k", 200)),
+                    "vlm_judge_enabled": bool(st.session_state.get("cfg_vlm_judge", False)),
+                    "vlm_judge_model": str(st.session_state.get("cfg_vlm_judge_model", "Qwen/Qwen2.5-VL-7B-Instruct")),
+                    "vlm_judge_backend": str(st.session_state.get("cfg_vlm_judge_backend", "qwen")),
+                    "vlm_judge_top_k": int(st.session_state.get("cfg_vlm_judge_top_k", 15)),
                     "vlm_backend": st.session_state.get("cfg_vlm_backend", "florence"),
                     "vlm_model": st.session_state.get("cfg_vlm_model", "microsoft/Florence-2-base-ft"),
                     "vlm_top_videos": int(st.session_state.get("cfg_vlm_top_videos", 20)),
@@ -1250,7 +1265,7 @@ with st.expander("Cấu hình nâng cao"):
     st.text_input("Manifest", DEFAULT_MANIFEST, key="cfg_manifest")
     st.text_input("Feature .npy", DEFAULT_FEATURES, key="cfg_features")
     st.text_input("Root keyframe", DEFAULT_ROOT, key="cfg_root")
-    st.text_input("CLIP model", DEFAULT_CLIP_MODEL, key="cfg_clip_model", help="ViT-B-32, ViT-L-14, ViT-L-14-quickgelu, ViT-B-16-SigLIP, ViT-SO400M-14-SigLIP-384")
+    st.text_input("CLIP / SigLIP model", DEFAULT_CLIP_MODEL, key="cfg_clip_model", help="SigLIP 2: ViT-SO400M-14-SigLIP2-378 (siglip2), ViT-B-16-SigLIP2-384 (siglip2-base) | SigLIP 1: ViT-SO400M-14-SigLIP-384 (siglip) | CLIP: ViT-L-14")
     st.text_input("CLIP pretrained", DEFAULT_CLIP_PRETRAINED, key="cfg_clip", help="openai, metaclip_fullcc, metaclip_400m, laion2b_s32b_b82k, webli")
     st.text_input("Ollama model", "qwen3.5:4b", key="cfg_llm")
     st.text_input("Ollama URL", "http://127.0.0.1:11434", key="cfg_ollama")
@@ -1278,9 +1293,18 @@ with st.expander("Cấu hình nâng cao"):
             "lớn = đầy đủ nhưng chậm/OOM. 0 = xét hết mọi video."
         ),
     )
+    # Cấu hình VLM-as-a-Judge (Qwen2.5-VL) thẩm định KIS, QA & TRAKE
+    st.markdown("---")
+    st.checkbox("⚖️ Kích hoạt VLM-as-a-Judge (Qwen2.5-VL)", value=False, key="cfg_vlm_judge",
+                help="Thẩm định chi tiết Top 15 ứng viên: phân tích chi tiết vật thể/màu sắc KIS, bằng chứng thị giác QA, và chuỗi sự kiện thời gian TRAKE.")
+    st.text_input("VLM Judge Model", "Qwen/Qwen2.5-VL-7B-Instruct", key="cfg_vlm_judge_model", help="Qwen/Qwen2.5-VL-7B-Instruct, Qwen/Qwen2.5-VL-3B-Instruct hoặc Ollama model")
+    st.selectbox("VLM Judge Backend", ["qwen", "ollama", "mock"], index=0, key="cfg_vlm_judge_backend")
+    st.number_input("VLM Judge: Số ứng viên thẩm định (Top-K)", min_value=1, max_value=50, value=15, key="cfg_vlm_judge_top_k")
+
     # Cấu hình VLM phục vụ Phase-2 QA
-    st.selectbox("QA VLM Backend", ["florence", "none"], index=0, key="cfg_vlm_backend",
-                 help="Florence-2 thay thế QwenVLM/Ollama (chạy CPU, không cần GPU/Ollama server).")
+    st.markdown("---")
+    st.selectbox("QA VLM Backend (Auto-answer)", ["none", "florence"], index=0, key="cfg_vlm_backend",
+                 help="Florence-2 tự sinh câu trả lời text cho QA (tùy chọn).")
     st.text_input("QA VLM Model", "microsoft/Florence-2-base-ft", key="cfg_vlm_model")
     st.number_input("QA VLM: Số video giới hạn gửi (vlm_top_videos)", min_value=1, max_value=200, value=20, key="cfg_vlm_top_videos")
     st.number_input("QA VLM: Số thread song song (vlm_max_workers)", min_value=1, max_value=32, value=8, key="cfg_vlm_max_workers")

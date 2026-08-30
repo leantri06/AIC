@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
+from aic2026.embeddings.text import normalize_model_name
 from aic2026.models import FrameRecord
 
 logger = logging.getLogger(__name__)
@@ -22,16 +23,21 @@ class ExtractionReport:
 
 
 class OpenCLIPFrameEncoder:
-    """Batch image encoder. Use the same CLIP checkpoint for image and query text embeddings."""
+    """Batch image encoder. Supports SigLIP 2, SigLIP, and CLIP checkpoints."""
     def __init__(self, model_name: str = "ViT-SO400M-14-SigLIP-384", pretrained: str = "webli", device: str | None = None):
         try:
             import open_clip
             import torch
         except ImportError as exc:
             raise RuntimeError("Install video/model extras: uv sync --extra video --extra models") from exc
+        resolved_name, resolved_pre = normalize_model_name(model_name, pretrained)
+        self.model_name = resolved_name
+        self.pretrained = resolved_pre
         self.torch = torch
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.model, _, self.preprocess = open_clip.create_model_and_transforms(model_name, pretrained=pretrained, device=self.device)
+        self.model, _, self.preprocess = open_clip.create_model_and_transforms(
+            self.model_name, pretrained=self.pretrained, device=self.device
+        )
         self.model.eval()
 
     def encode_images(self, images: Iterable[object]) -> np.ndarray:
@@ -250,7 +256,8 @@ def _load_csv_frame_indices(map_dir: Path | None, video_id: str) -> list[int] | 
             map_dir / f"{video_id}.csv",
             map_dir / "map-keyframes" / f"{video_id}.csv",
         ])
-    candidates.append(Path("D:/aichallenge/data/extracted/map-keyframes") / f"{video_id}.csv")
+    candidates.append(Path("D:/ai_challenge/data/extracted/map-keyframes") / f"{video_id}.csv")
+    candidates.append(Path("D:/ai_challenge/data/raw/map-keyframes") / f"{video_id}.csv")
     p = next((c for c in candidates if c.exists()), None)
     if not p:
         return None
