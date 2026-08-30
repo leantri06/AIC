@@ -72,6 +72,7 @@ class RuntimeConfig(BaseModel):
     late_interaction_weight: float = 0.0
     metadata_filter: str = ""
     translate_query: bool = False
+    search_mode: str = "hybrid"
     vlm_backend: str = "florence"
     vlm_model: str = "microsoft/Florence-2-base-ft"
     vlm_device: str | None = None
@@ -224,6 +225,7 @@ def run_task(task_type: str, request: TaskRequest) -> AgentResult:
             query_type=task_type,
             clip_model=config.clip_model,
         )
+        orchestrator.search_mode = config.search_mode
         return orchestrator.run(Query(query_id=request.query_id, type=task_type, text=request.text, question=request.question, events=request.events))
     except HTTPException:
         raise
@@ -314,6 +316,7 @@ def run_qa_candidates(request: TaskRequest) -> AgentResult:
         # Phase-1 QA: retrieval only, no VLM. We pass vlm_backend="none" above so
         # tools.vlm_model is unset and ensure_vlm() is a no-op in _finalize — no
         # need to null the callables (that previously corrupted the cached agent).
+        orchestrator.search_mode = config.search_mode
         query = Query(
             query_id=request.query_id,
             type="qa",

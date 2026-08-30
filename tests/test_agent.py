@@ -437,3 +437,42 @@ def test_openclip_prompt_ensembling_normalized() -> None:
     # Ensemble should be closely aligned with single, but smooth out template variance
     cos_sim = float(v_ens @ v_single)
     assert 0.85 < cos_sim <= 1.0001
+
+
+def test_agent_search_modes() -> None:
+    """Verify that agent search_mode correctly routes weights and query texts."""
+    tools = make_tools()
+    query = Query(query_id="q-test", type="kis", text="phát thanh viên bản tin 60 giây")
+
+    # 1. SigLIP only mode
+    agent_siglip = RetrievalAgent(tools, llm=BuggyLLM())
+    agent_siglip.search_mode = "siglip"
+    res_siglip = agent_siglip.run(query)
+    assert res_siglip.plan.modality.w_vis == 1.0
+    assert res_siglip.plan.modality.w_ocr == 0.0
+    assert res_siglip.plan.modality.w_asr == 0.0
+
+    # 2. ASR only mode
+    agent_asr = RetrievalAgent(tools, llm=BuggyLLM())
+    agent_asr.search_mode = "asr"
+    res_asr = agent_asr.run(query)
+    assert res_asr.plan.modality.w_vis == 0.0
+    assert res_asr.plan.modality.w_ocr == 0.0
+    assert res_asr.plan.modality.w_asr == 1.0
+    assert res_asr.plan.modality.asr_query == query.text
+
+    # 3. OCR only mode
+    agent_ocr = RetrievalAgent(tools, llm=BuggyLLM())
+    agent_ocr.search_mode = "ocr"
+    res_ocr = agent_ocr.run(query)
+    assert res_ocr.plan.modality.w_vis == 0.0
+    assert res_ocr.plan.modality.w_ocr == 1.0
+    assert res_ocr.plan.modality.w_asr == 0.0
+    assert res_ocr.plan.modality.ocr_query == query.text
+
+    # 4. Hybrid mode (default)
+    agent_hybrid = RetrievalAgent(tools, llm=BuggyLLM())
+    agent_hybrid.search_mode = "hybrid"
+    res_hybrid = agent_hybrid.run(query)
+    assert res_hybrid.plan.modality.w_vis > 0
+

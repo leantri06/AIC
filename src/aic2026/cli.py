@@ -777,6 +777,7 @@ def agent_query(
     drop_empty_object_frames: bool = typer.Option(False, help="KIS: loại hẳn frame KHÔNG có vật thể nào (ảnh mờ, không entity đạt ngưỡng 0.4) khi query có hỏi vật thể. Giảm truy xuất đến frame nhiễu. Tắt nếu sợ mất recall."),
     trake_preferred_prefixes: str = typer.Option("", help="Ưu tiên (soft bias, KHÔNG loại trừ) TRAKE vào tiền tố video_id, cách nhau dấu phẩy (vd: L26). KIS/Q&A luôn xét TOÀN BỘ video. Để trống = mặc định ưu tiên L26. Truyền '.' để tắt ưu tiên."),
     translate: bool = typer.Option(False, help="Dịch VI→EN trước khi retrieval (CLIP là tiếng Anh). Mặc định tắt: dùng query nguyên bản."),
+    search_mode: str = typer.Option("hybrid", "--mode", "-m", help="Chế độ tìm kiếm: hybrid (mặc định), siglip, asr, ocr"),
     clip_model: str = typer.Option("ViT-SO400M-14-SigLIP-384", help="Mô hình CLIP (ViT-SO400M-14-SigLIP-384, ViT-L-14, ViT-B-32, ViT-L-14-quickgelu, ViT-B-16-SigLIP)"),
     clip_pretrained: str = typer.Option("webli", help="Checkpoint (webli, openai, metaclip_fullcc, metaclip_400m, laion2b_s32b_b82k)"),
     output: Path | None = typer.Option(None),
@@ -853,6 +854,7 @@ def agent_query(
     )
     agent.coarse_top_k = coarse_top_k
     agent.translate = translate
+    agent.search_mode = search_mode
     result = agent.run(parsed_query)
     if parsed_query.type == "qa" and not any(c.answer for c in result.candidates):
         typer.echo(

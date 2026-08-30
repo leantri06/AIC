@@ -56,6 +56,8 @@ class RetrievalAgent:
         #  (3) có query đòi giữ nguyên cụm từ gốc (tên riêng, chữ trên biển báo).
         # Bật qua nút "Dịch VI→EN" trên UI hoặc tham số khi khởi tạo agent.
         self.translate: bool = False
+        # Chế độ tìm kiếm: 'hybrid' (mặc định), 'siglip', 'asr', 'ocr'
+        self.search_mode: str = "hybrid"
 
     @staticmethod
     def _deduplicate_best(
@@ -186,6 +188,8 @@ class RetrievalAgent:
         else:
             visual_facets = None
 
+        raw_text = query.text
+
         # Modality routing & decomposition (Visual / OCR / ASR) — AAAI 2026
         modality_plan = decompose_query_modalities(
             retrieval_text,
@@ -195,6 +199,30 @@ class RetrievalAgent:
         if visual_facets and visual_facets.q_core:
             modality_plan.visual_query = visual_facets.q_core
 
+        # Override modality weights and queries according to explicit search_mode if set
+        mode = (getattr(self, "search_mode", "hybrid") or "hybrid").lower()
+        if mode == "siglip":
+            modality_plan.w_vis = 1.0
+            modality_plan.w_ocr = 0.0
+            modality_plan.w_asr = 0.0
+        elif mode == "asr":
+            modality_plan.w_vis = 0.0
+            modality_plan.w_ocr = 0.0
+            modality_plan.w_asr = 1.0
+            modality_plan.asr_query = raw_text
+        elif mode == "ocr":
+            modality_plan.w_vis = 0.0
+            modality_plan.w_ocr = 1.0
+            modality_plan.w_asr = 0.0
+            modality_plan.ocr_query = raw_text
+
+        mode_label = {
+            "siglip": "SigLIP (Visual)",
+            "asr": "ASR (Speech)",
+            "ocr": "OCR (On-screen text)",
+            "hybrid": "Hybrid Multimodal",
+        }.get(mode, mode.upper())
+
         plan = AgentPlan(
             query_variants=visual_facets.to_list() if visual_facets is not None else [retrieval_text],
             events=(
@@ -203,8 +231,8 @@ class RetrievalAgent:
                 else []
             ),
             rationale=(
-                f"Adaptive multimodal plan (w_vis={modality_plan.w_vis}, "
-                f"w_ocr={modality_plan.w_ocr}, w_asr={modality_plan.w_asr})"
+                f"[{mode_label}] Plan (w_vis={modality_plan.w_vis:.2f}, "
+                f"w_ocr={modality_plan.w_ocr:.2f}, w_asr={modality_plan.w_asr:.2f})"
                 + (f" with 4-Facet GQE: q_core='{visual_facets.q_core[:60]}...'" if visual_facets else "")
             ),
             modality=modality_plan,

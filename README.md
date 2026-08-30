@@ -1,198 +1,244 @@
-# AIC 2026 — Video Retrieval (KIS / Q&A / TRAKE)
+# 🚀 AIC 2026 — PEGASUS Video Retrieval System
 
-Pipeline cho 3 task vòng sơ tuyển AIC 2026, dựa trên **CLIP ViT-B-32** (index chính) + **BM25** (lexical từ Objects/Metadata). Bỏ SigLIP2. Chạy được **CPU-only**; VLM/Q&A GPU làm giai đoạn sau.
-
-## Mục lục
-1. [LƯU Ý WINDOWS — cách chạy lệnh](#1-lưu-ý-windows--cách-chạy-lệnh)
-2. [Cài đặt](#2-cài-đặt)
-3. [Cấu trúc dữ liệu](#3-cấu-trúc-dữ-liệu)
-4. [Cách chạy — Chế độ A: chỉ có Keyframes](#4-cách-chạy--chế-độ-a-chỉ-có-keyframes)
-5. [Cách chạy — Chế độ B: có đầy đủ data BTC](#5-cách-chạy--chế-độ-b-có-đầy-đủ-data-btc)
-6. [Chạy agent (KIS / Q&A / TRAKE)](#6-chạy-agent-kis--qa--trake)
-7. [Đánh giá (evaluate)](#7-đánh-giá-evaluate)
-8. [Giao diện UI](#8-giao-diện-ui)
-9. [Điểm quan trọng về frame_id và metadata](#9-điểm-quan-trọng-về-frame_id-và-metadata)
+Hệ thống tìm kiếm video đa phương thức cho 3 bài toán vòng sơ tuyển **AI Challenge 2026 (KIS / Q&A / TRAKE)**:
+* **Vector Search:** SigLIP (`ViT-SO400M-14-SigLIP-384` / `ViT-L-14`) trích xuất embedding đa phương thức.
+* **Lexical & Metadata:** BM25 nhãn vật thể (Faster R-CNN) + Tiêu đề/mô tả YouTube.
+* **Lời thoại ASR:** Whisper trích xuất lời thoại tiếng Việt có mốc thời gian, gắn trực tiếp vào từng keyframe.
+* **Reranking & Filtering:** Hybrid RRF (Reciprocal Rank Fusion) + Bộ lọc màu sắc.
+* **VLM Q&A:** Trả lời câu hỏi hình ảnh bằng mô hình cục bộ (Qwen2.5-VL / Ollama / Florence-2).
+* **TRAKE:** Căn chỉnh chuỗi sự kiện theo thứ tự thời gian bằng Dynamic Programming.
 
 ---
 
-## 1. LƯU Ý WINDOWS — cách chạy lệnh
-
-> ⚠️ **Quan trọng nhất:** bạn đang dùng **Windows (cmd / PowerShell)** thì **KHÔNG dùng dấu `\` xuống dòng** — đó là cú pháp Linux/Mac, cmd báo `'python' is not recognized` hoặc tương tự. Mỗi lệnh phải gõ **trên một dòng duy nhất**:
-
-```bat
-:: ✅ ĐÚNG — tất cả trên 1 dòng, cmd chạy được
-python -m aic2026.cli embed-keyframes --keyframes-dir data/raw/Keyframes --features-dir data/processed/clip_features --manifest data/processed/derived_manifest.jsonl --features data/processed/derived_features.npy --video-id L21_V001
-
-
-- Lệnh dài thì **copy nguyên cụm 1 dòng** từ README dán vào terminal là được.
-- PowerShell muốn xuống dòng thì dùng `` ` `` (backtick) — nhưng khuyến nghị cứ gõ 1 dòng cho chắc.
-- Tất cả code block dạng `bat` trong README này đã được viết **sẵn trên 1 dòng**, copy nguyên văn là chạy được.
+## 📑 Mục lục
+1. [Cài đặt môi trường](#1-cài-đặt-môi-trường)
+2. [Cấu trúc thư mục Dữ liệu tách riêng](#2-cấu-trúc-thư-mục-dữ-liệu-tách-riêng)
+3. [Chuẩn bị dữ liệu & Index (Chỉ định đường dẫn ngoài)](#3-chuẩn-bị-dữ-liệu--index-chỉ-định-đường-dẫn-ngoài)
+4. [Khởi động Giao diện PEGASUS Web & Cấu hình đường dẫn](#4-khởi-động-giao-diện-pegasus-web--cấu-hình-đường-dẫn)
+5. [Hướng dẫn Tìm kiếm & Xuất bài nộp BTC](#5-hướng-dẫn-tìm-kiếm--xuất-bài-nộp-btc)
+6. [Chạy bằng CLI & Đánh giá (Evaluate)](#6-chạy-bằng-cli--đánh-giá-evaluate)
+7. [Xử lý sự cố thường gặp (Troubleshooting)](#7-xử-lý-sự-cố-thường-gặp-troubleshooting)
 
 ---
 
-## 2. Cài đặt
+## 1. Cài đặt môi trường
 
-> ⚠️ Nếu bạn **đã có `.venv`** rồi (đang chạy được code), **KHÔNG chạy lại `python -m venv .venv`** — lệnh đó chỉ cần lần đầu.
+### Yêu cầu tiên quyết:
+* **Hệ điều hành:** Windows 10/11 hoặc Linux / macOS.
+* **Python:** `3.10` – `3.12` (khuyên dùng Python 3.11).
+* **GPU NVIDIA (Khuyên dùng):** GTX 1060 trở lên hoặc RTX Series để tăng tốc trích xuất và tìm kiếm.
 
-```bash
-# Python 3.11+
-python -m venv .venv        # CHỈ LẦN ĐẦU khi chưa có .venv
-# Linux/Mac
-source .venv/bin/activate
-# Windows
+### Các bước cài đặt:
+
+Mở **PowerShell / Terminal** tại thư mục gốc `my-repo`:
+
+```powershell
+# 1. Tạo môi trường ảo (chỉ chạy lần đầu)
+uv venv --python 3.11 .venv
+# Hoặc dùng python chuẩn: python -m venv .venv
+
+# 2. Kích hoạt môi trường ảo
+# Windows:
 .venv\Scripts\activate
+# Linux / macOS:
+# source .venv/bin/activate
 
-# Dùng uv (nhanh, khuyến nghị) — nhớ --extra agent (langgraph cho pipeline agent)
-uv sync --extra retrieval --extra models --extra video --extra agent --extra dev
-# Hoặc pip
-pip install -e ".[retrieval,models,video,agent,dev]"
+# 3. Cài đặt toàn bộ dependencies của dự án bằng uv (khuyên dùng)
+uv sync --extra retrieval --extra models --extra video --extra asr --extra agent --extra dev
+# Hoặc bằng pip:
+# pip install -e ".[retrieval,models,video,asr,agent,dev]"
+
+# 4. (Tùy chọn) Cài đặt PyTorch CUDA cho GPU NVIDIA
+uv pip install --reinstall-package torch torchvision --extra-index-url https://download.pytorch.org/whl/cu124
 ```
 
-> **Nếu `uv sync` báo "Access denied" (zstandard .pyd):** có tiến trình python đang giữ file. Đóng hết cửa sổ dùng `.venv` (Streamlit, server agent), rồi chạy lại `uv sync`.
-
-Cài Ollama (cho planner/judge) — **model nào cũng được** (qwen3.5:4b, qwen3:8b, llama3.1...). Mặc định code dùng `qwen3.5:4b`; đổi qua flag `--llm-model` nếu cần:
-```bash
-ollama pull qwen3.5:4b
-ollama serve   # chạy ở terminal khác
-```
+> **Cài đặt Ollama (cho Agent / VLM):**
+> ```bash
+> ollama pull qwen3.5:4b
+> ollama serve
+> ```
 
 ---
 
-## 3. Cấu trúc dữ liệu
+## 2. Cấu trúc thư mục Dữ liệu tách riêng
+
+> [!NOTE]
+> **Toàn bộ thư mục dữ liệu (`raw` và `processed`) được lưu riêng biệt ngoài `my-repo`** (ví dụ tại `D:\aichallenge_data\` hoặc bất kỳ ổ đĩa nào) để tránh nặng repo và tiện quản lý.
+
+Sơ đồ cấu trúc thư mục data bên ngoài:
 
 ```text
-data/
-├── raw/
-│   ├── Videos/        # .mp4 gốc (BTC) — KHÔNG bắt buộc
-│   ├── Keyframes/     # keyframe BTC (bắt buộc) — L01_V001/0000.jpg, ...
-│   ├── Objects/       # JSON Faster R-CNN (tùy chọn, nên có)
-│   ├── Metadata/      # JSON YouTube (tùy chọn, nên có)
-│   └── CLIP features/ # 1 file .npy CLIP ViT-B-32 (tùy chọn, nên có)
-├── downloads/         # ZIP hỗ trợ BTC (clip-features, map-keyframes, media-info, objects)
-└── processed/         # Code tự sinh: manifest, features, index
-```
-
-**Nguyên tắc:** pipeline chạy tốt **chỉ với Keyframes** (Chế độ A). Các nhóm còn lại (Objects/Metadata/CLIP features) làm cho retrieval **chính xác hơn** — điền vào sau càng tốt, code tự phát hiện và dùng.
-
-> **Nếu bạn đã tự extract keyframe bằng CLI (`extract-keyframes`)** thì thư mục là `data/raw/keyframes` (chữ thường) thay vì `data/raw/Keyframes`. Các lệnh dưới đây viết theo tên chuẩn BTC (`Keyframes`); bạn đổi cho khớp với tên thư mục thực tế của mình.
-
----
-
-## 4. Cách chạy — Chế độ A: chỉ có Keyframes
-
-Nếu bạn **chỉ có thư mục Keyframes** (chưa có Objects/Metadata/CLIP features):
-
-```bat
-:: 1. Encode toàn bộ keyframe bằng CLIP ViT-B-32 (tạo features + manifest + index)
-::    Bỏ --video-id để encode hết; hoặc chỉ 1 video để test nhanh (1 dòng duy nhất)
-python -m aic2026.cli embed-keyframes --keyframes-dir data/raw/Keyframes --features-dir data/processed/clip_features --manifest data/processed/derived_manifest.jsonl --features data/processed/derived_features.npy --video-id L21_V001
-
-:: 2. Kiểm tra index khớp (số feature = số manifest)
-python -m aic2026.cli check-features data/processed/derived_features.npy data/processed/derived_manifest.jsonl
-```
-
-> **Lưu ý:** ở chế độ này `frame_id` = thứ tự (ordinal) trong tên file keyframe (vì chưa có Metadata để map). Chạy KIS/TRAKE vẫn được, nhưng khi bạn có Metadata BTC, hãy chuyển sang Chế độ B để map `frame_id` thật.
-
----
-
-## 5. Cách chạy — Chế độ B: có đầy đủ data BTC
-
-Nếu bạn có **Keyframes + Objects + Metadata + CLIP features** (đầy đủ 5 nhóm):
-
-### Bước 1 — Giải nén ZIP hỗ trợ (nếu BTC cấp dạng ZIP)
-```bat
-python -m aic2026.cli unpack-support-assets --archives-dir data/downloads --destination data/raw/support
-```
-
-### Bước 2 — Kiểm tra nhận diện 5 nhóm asset
-```bat
-python -m aic2026.cli inspect-data --raw-dir data/raw
-```
-
-### Bước 3 — Probe file CLIP features chính thức (xác định thứ tự hàng trong .npy)
-> Nếu tên thư mục có khoảng trắng như `CLIP features`, bọc đường dẫn trong dấu `"..."` — 1 dòng duy nhất:
-```bat
-python -m aic2026.cli probe-official-features --features "data/raw/CLIP features/clip_feature.npy" --raw-dir data/raw --metadata-dir data/raw/Metadata
-```
-
-### Bước 4 — Build manifest + index khớp đúng frame_id thật
-```bat
-python -m aic2026.cli prepare-official --features "data/raw/CLIP features/clip_feature.npy" --raw-dir data/raw --output-manifest data/processed/official_manifest.jsonl --output-features data/processed/official_features.npy
-
-:: Kiểm tra khớp
-python -m aic2026.cli check-features data/processed/official_features.npy data/processed/official_manifest.jsonl
-```
-
-### Bước 5 — (Tùy chọn) Nếu không có CLIP features BTC, tự encode từ Keyframes
-```bat
-python -m aic2026.cli embed-keyframes --keyframes-dir data/raw/Keyframes --features-dir data/processed/clip_features --manifest data/processed/derived_manifest.jsonl --features data/processed/derived_features.npy
+D:\aichallenge_data\ (Thư mục dữ liệu bên ngoài)
+├── raw/                              # Dữ liệu giải nén do BTC cung cấp
+│   ├── Keyframes/                    # Thư mục ảnh keyframe (L21_V001/001.jpg, ...)
+│   ├── map-keyframes/                # File CSV ánh xạ frame_idx gốc
+│   ├── Objects/                      # File JSON nhãn vật thể Faster R-CNN
+│   ├── Metadata/                     # File JSON thông tin video YouTube
+│   ├── CLIP features/                # (Tùy chọn) File .npy CLIP gốc của BTC
+│   └── Videos/                       # (Tùy chọn) File video .mp4 gốc
+└── processed/                        # Dữ liệu index đã xử lý (đầu ra của hệ thống)
+    ├── siglip_manifest.jsonl         # Manifest chính (vector_id, frame_id, labels, asr_text)
+    ├── siglip_features.npy           # Ma trận vector đặc trưng tương ứng
+    ├── colour_features.jsonl         # Đặc trưng màu sắc (tùy chọn)
+    └── asr/                          # Lời thoại JSON theo timestamp từng video
 ```
 
 ---
 
-## 6. Đánh giá (evaluate)
+## 3. Chuẩn bị dữ liệu & Index (Chỉ định đường dẫn ngoài)
 
-Đánh giá 1 query với ground-truth theo đúng công thức R@k + Final Score của BTC.
+*(Thay thế `D:\aichallenge_data` bằng đường dẫn thực tế trên máy bạn)*
 
-> ⚠️ **Lệnh `evaluate` nhận 3 argument vị trí (`query candidates ground_truth`), KHÔNG phải flag `--query/--candidates/--ground-truth`.**
-> Đồng thời, `agent-query` ghi file kết quả dạng object `{candidates, plan, trace}` — nhưng `evaluate` cần **một JSON array** `[{...candidate}, ...]`. Vì vậy phải trích mảng `candidates` ra trước:
+### 3.1. Tự Encode Keyframes bằng GPU (Mô hình SigLIP mặc định)
+```powershell
+python -m aic2026.cli embed-keyframes `
+  --keyframes-dir "D:\aichallenge_data\raw\Keyframes" `
+  --map-keyframes-dir "D:\aichallenge_data\raw\map-keyframes" `
+  --features-dir "D:\aichallenge_data\processed\siglip_features_dir" `
+  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
+  --features "D:\aichallenge_data\processed\siglip_features.npy" `
+  --clip-model "ViT-SO400M-14-SigLIP-384" `
+  --clip-pretrained "webli" `
+  --device cuda `
+  --batch-size 64
+```
+*(Hỗ trợ resume tự động nếu bị ngắt quãng).*
 
-```bat
-:: 1. Trích mảng candidates từ kết quả agent-query (dùng JQ nếu có, hoặc script nhỏ bên dưới)
-jq ".candidates" outputs/result_kis.json > outputs/candidates_kis.json
-
-:: 2. Đánh giá — lưu ý 3 argument vị trí, không có --query/--candidates
-python -m aic2026.cli evaluate query_kis.json outputs/candidates_kis.json ground_truth_kis.json
+### 3.2. Ánh xạ lời thoại ASR vào Manifest
+```powershell
+python -m aic2026.cli asr-manifest `
+  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
+  --asr-dir "D:\aichallenge_data\processed\asr"
 ```
 
-Nếu không có `jq`, tạo `outputs/candidates_kis.json` bằng lệnh sau:
-```bat
-python -c "import json; d=json.load(open('outputs/result_kis.json', encoding='utf-8')); json.dump(d['candidates'], open('outputs/candidates_kis.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=2)"
+### 3.3. Tiền trích xuất đặc trưng màu sắc (Tùy chọn)
+```powershell
+python -m aic2026.cli compute-colour-features `
+  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
+  --raw-dir "D:\aichallenge_data\raw" `
+  --output "D:\aichallenge_data\processed\colour_features.jsonl"
 ```
 
-**Ground truth** theo schema `GroundTruth` (`video_id`, `ranges: [[start,end], ...]`, `answer?`):
+### 3.4. Kiểm tra tính đồng bộ của Index
+```powershell
+python -m aic2026.cli check-features "D:\aichallenge_data\processed\siglip_features.npy" "D:\aichallenge_data\processed\siglip_manifest.jsonl"
+```
+
+---
+
+## 4. Khởi động Giao diện PEGASUS Web & Cấu hình đường dẫn
+
+### Khởi động Web UI:
+* **Cách 1 (Nhanh):** Nhấp đúp chuột vào [`run_app.bat`](file:///d:/bachkhoa/ai_challenge/my-repo/run_app.bat).
+* **Cách 2 (Terminal):** `streamlit run src/aic2026/app/ui.py`
+* **Cách 3 (Backend API + UI):** Terminal 1: `python -m aic2026.cli serve` | Terminal 2: `streamlit run src/aic2026/app/ui.py`
+
+### ⚙️ Cấu hình đường dẫn Data ngoài trên Web UI:
+Trên thanh bên trái (Sidebar) của Web UI:
+1. Mở rộng mục **"Cấu hình nâng cao"** (hoặc Advanced Settings).
+2. Điền đường dẫn tới thư mục data ngoài của bạn:
+   * **Manifest Path:** `D:\aichallenge_data\processed\siglip_manifest.jsonl`
+   * **Features Path:** `D:\aichallenge_data\processed\siglip_features.npy`
+   * **Keyframes Dir:** `D:\aichallenge_data\raw\Keyframes`
+   * **Map Keyframes Dir:** `D:\aichallenge_data\raw\map-keyframes`
+   * **Videos Dir:** `D:\aichallenge_data\raw\Videos` (nếu có)
+3. Giao diện sẽ tự động lưu và kết nối với dữ liệu ngoài.
+
+---
+
+## 5. Hướng dẫn Tìm kiếm & Xuất bài nộp BTC
+
+### 5.1. Bốn Chế độ Tìm kiếm Chuyên biệt (Search Modality):
+Hệ thống cho phép bạn linh hoạt chọn kênh tìm kiếm phù hợp với từng dạng câu hỏi:
+
+| Chế độ | Ý nghĩa | Khi nào nên chọn? |
+| :--- | :--- | :--- |
+| 🌈 **Đa kênh (Hybrid)** | Dung hợp SigLIP + ASR + OCR | Mặc định, dùng khi câu hỏi vừa có mô tả hình ảnh vừa có từ khóa/lời thoại. |
+| 👁️ **Thị giác (SigLIP)** | Thuần Visual Vector Search ($w_{\text{vis}}=1.0$) | Dùng khi câu hỏi thuần mô tả thị giác/hình ảnh (ví dụ: *"người phụ nữ mặc áo đỏ lái xe"*). |
+| 🗣️ **Lời thoại (ASR)** | Thuần Speech Search ($w_{\text{asr}}=1.0$) | Dùng khi câu hỏi trích dẫn câu thoại của nhân vật (ví dụ: *"bản tin thông báo thời tiết"*). Giữ nguyên tiếng Việt 100%, tìm kiếm tức thì. |
+| 🔤 **Chữ màn hình (OCR)** | Thuần OCR Text Search ($w_{\text{ocr}}=1.0$) | Dùng khi câu hỏi tìm biển báo, banner, logo, chữ trên màn hình (ví dụ: *"biển hiệu Phở 24"*). |
+
+### 5.2. Các luồng bài toán:
+1. **Tìm kiếm KIS (Known-Item Search):** Tìm 1 khung hình chính xác theo mô tả.
+2. **Tìm kiếm Q&A:** Nhập ngữ cảnh và câu hỏi, VLM cục bộ sẽ đọc ảnh và trả lời.
+3. **Tìm kiếm TRAKE:** Tìm chuỗi sự kiện theo thứ tự thời gian.
+
+### 5.3. Chọn kết quả & Xuất file nộp bài:
+1. Click trực tiếp lên các card ảnh kết quả để chọn đáp án đúng.
+2. Các ảnh được chọn sẽ có khung viền màu hồng đánh dấu thứ tự click.
+3. Bấm nút **"Xuất CSV nộp bài"** để tải file CSV đúng định dạng nộp cho BTC.
+
+---
+
+## 6. Chạy bằng CLI & Đánh giá (Evaluate)
+
+### 6.1. Chạy truy vấn KIS bằng CLI (có chọn chế độ `--mode`):
+Tạo file `query_kis.json`:
 ```json
 {
-  "video_id": "L01_V001",
-  "ranges": [[500, 510]]
+  "query_id": "kis_001",
+  "type": "kis",
+  "text": "bản tin thời sự sạt lở bờ sông"
 }
 ```
 
-> **Q&A:** đánh giá **ngữ nghĩa** (đúng quy định BTC) — không so chuỗi chính xác. "màu xanh" vs "xanh", "xanh lá cây" vs "màu xanh lá" đều tính là khớp.
+Thực thi tìm kiếm (`--mode` có thể chọn `hybrid`, `siglip`, `asr`, `ocr`):
+```powershell
+# 1. Tìm kiếm -> JSON (ví dụ tìm thuần theo lời thoại ASR)
+python -m aic2026.cli agent-query `
+  --query query_kis.json `
+  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
+  --features "D:\aichallenge_data\processed\siglip_features.npy" `
+  --mode asr `
+  --output outputs/result_kis.json
 
----
-
-## 8. Giao diện UI
-
-> ⚠️ Chạy **từ thư mục gốc dự án** (`D:\MinhHuy\AIC2026`) — đường dẫn tương đối trong code (`data/...`, `src/...`) được tính theo thư mục làm việc hiện tại.
-
-```bat
-:: Backend FastAPI (terminal 1) — mở trong thư mục gốc dự án
-python -m aic2026.cli serve
-
-:: Giao diện Streamlit (terminal 2)
-streamlit run src/aic2026/app/ui.py
+# 2. Xuất CSV nộp bài
+python -m aic2026.cli export-submission --result outputs/result_kis.json --query query_kis.json --output outputs/submission_kis.csv
 ```
 
-Mở `http://127.0.0.1:8000` (API docs) và `http://127.0.0.1:8501` (UI).
-
----
-
-## 9. Điểm quan trọng về frame_id và metadata
-
-1. **frame_id là frame index thật của video**, không phải thứ tự keyframe. Khi có Metadata BTC (field `frame_indices`/`keyframe_indices`), `prepare-official` sẽ map đúng. Ở Chế độ A (chỉ Keyframes) thì tạm dùng ordinal.
-2. **Metadata filter tăng precision:** với query như "người đi bộ trong cửa hàng", pipeline có thể **lọc video theo metadata** ("cửa hàng") trước khi CLIP search — giảm frame sai, tăng precision. Code đã có sẵn `filter_videos_by_metadata`.
-3. **Videos (.mp4) không bắt buộc** — chỉ cần khi re-extract keyframe fallback.
-4. **Submission tối đa 100 answers/query**, chỉ xuất field đúng chuẩn BTC (`video_id`, `frame_id`, `answer`, `frame_ids`).
-
----
-
-## Cấu hình
-
-Cấu hình chạy được truyền trực tiếp qua CLI (`aic2026 --help`) và qua UI "Cấu hình nâng cao" (Backend API, Manifest, Feature, CLIP pretrained, Ollama model/URL, Metadata/Object filter, `coarse_top_k`). Không dùng file config YAML.
-
-## Test
-
-```bash
-python -m pytest tests/ -q
+### 6.2. Chạy truy vấn TRAKE bằng CLI:
+Tạo file `query_trake.json`:
+```json
+{
+  "query_id": "trake_001",
+  "type": "trake",
+  "text": "Một người mở tủ lạnh, lấy chai nước và uống",
+  "events": [
+    "A person opens the refrigerator door",
+    "Taking out a bottle of water",
+    "Drinking water from the bottle"
+  ]
+}
 ```
+
+Xuất kết quả TRAKE (kết quả CSV chứa `video_id,f1,f2,f3` theo thứ tự các event):
+```powershell
+python -m aic2026.cli agent-query `
+  --query query_trake.json `
+  --manifest "D:\aichallenge_data\processed\siglip_manifest.jsonl" `
+  --features "D:\aichallenge_data\processed\siglip_features.npy" `
+  --output outputs/result_trake.json
+
+python -m aic2026.cli export-submission --result outputs/result_trake.json --query query_trake.json --output outputs/submission_trake.csv
+```
+
+### 6.3. Đánh giá Ground-Truth (Evaluate):
+```powershell
+# Trích mảng candidates từ kết quả JSON
+python -c "import json; d=json.load(open('outputs/result_kis.json', encoding='utf-8')); json.dump(d['candidates'], open('outputs/candidates_kis.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=2)"
+
+# Đánh giá R@k và Final Score
+python -m aic2026.cli evaluate query_kis.json outputs/candidates_kis.json ground_truth_kis.json
+```
+
+---
+
+## 7. Xử lý sự cố thường gặp (Troubleshooting)
+
+| Vấn đề / Lỗi | Nguyên nhân | Cách khắc phục |
+| :--- | :--- | :--- |
+| **`activate.ps1 cannot be loaded...`** | PowerShell chặn script thực thi. | Chạy lệnh: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process` |
+| **`CUDA Available: False`** | Chưa cài bản PyTorch có CUDA. | Chạy: `uv pip install --reinstall-package torch torchvision --extra-index-url https://download.pytorch.org/whl/cu124` |
+| **Lỗi OpenMP `libiomp5md.dll`** | Trùng thư viện runtime giữa PyTorch và các gói khác trên Windows. | Trong PowerShell chạy: `$env:KMP_DUPLICATE_LIB_OK="TRUE"` trước khi chạy lệnh. |
+| **Ảnh không hiển thị trên Web UI** | Đường dẫn `Keyframes Dir` trỏ chưa đúng thư mục data bên ngoài. | Vào mục **Cấu hình nâng cao** trên Sidebar của Web UI, chỉnh lại đường dẫn `Keyframes Dir` trỏ đến thư mục chứa ảnh (vd: `D:\aichallenge_data\raw\Keyframes`). |
+| **Chạy kiểm thử toàn bộ hệ thống** | Kiểm tra tính ổn định của mã nguồn. | Chạy lệnh: `pytest` |

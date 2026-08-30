@@ -335,8 +335,16 @@ def run_backend_qa_answers(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def parse_events(events_text: str) -> list[str]:
+def parse_events(events_text: str, text: str = "") -> list[str]:
     raw_lines = [line.strip() for line in (events_text or "").splitlines() if line.strip()]
+    if not raw_lines and text:
+        # Tự động bóc tách sự kiện từ text nếu ô events để trống
+        raw_lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if len(raw_lines) == 1:
+            parts = _re.split(r"(?:^|\s+)\d+[\s:.)-]+\s*", raw_lines[0])
+            parts = [p.strip() for p in parts if p.strip()]
+            if len(parts) >= 2:
+                raw_lines = parts
     if len(raw_lines) == 1:
         if ";" in raw_lines[0]:
             raw_lines = [part.strip() for part in raw_lines[0].split(";") if part.strip()]
@@ -351,12 +359,13 @@ def parse_events(events_text: str) -> list[str]:
 
 
 def build_query(query_type: str, text: str, question: str, events_text: str) -> Query:
+    evs = parse_events(events_text, text=text)
     return Query(
         query_id="live-query",
         type=query_type or "kis",
-        text=text.strip(),
+        text=text.strip() or (evs[0] if evs else ""),
         question=question.strip() or None,
-        events=parse_events(events_text),
+        events=evs,
     )
 
 
@@ -374,6 +383,19 @@ def load_asr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
             (record.video_id, record.frame_id): record.asr_text
             for record in records
             if getattr(record, "asr_text", None)
+        }
+    except Exception:
+        return {}
+
+
+@st.cache_data(show_spinner=False)
+def load_ocr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
+    try:
+        records = load_manifest(Path(manifest_path))
+        return {
+            (record.video_id, record.frame_id): record.object_labels
+            for record in records
+            if getattr(record, "object_labels", None)
         }
     except Exception:
         return {}
@@ -871,11 +893,12 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
     nonce = int(st.session_state.get("_query_nonce", 0))
     manifest_path = st.session_state.get("manifest_path")
     asr_lookup = load_asr_lookup(manifest_path) if manifest_path else {}
+    ocr_lookup = load_ocr_lookup(manifest_path) if manifest_path else {}
     lookup = load_keyframe_lookup(manifest_path) if manifest_path else {}
     map_dir = st.session_state.get("cfg_map_keyframes", DEFAULT_MAP_KEYFRAMES)
     videos_root = st.session_state.get("cfg_videos_root", DEFAULT_VIDEOS_ROOT)
 
-    st.subheader(f"Gallery ({len(visible)} ảnh)")
+    st.subheader(f"🖼️ Gallery Kết quả ({len(visible)} ảnh keyframe)")
     grid = st.columns(5)
     for pos, (idx, item) in enumerate(visible):
         path = keyframe_file(item, root)
@@ -889,27 +912,36 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
             else:
                 st.markdown(f'<div class="gallery-card-container" data-video-id="{html.escape(item.video_id)}">', unsafe_allow_html=True)
                 st.caption("Không có ảnh")
-            answer_html = ""
-            if query.type == "qa":
-                ans = item.answer or "⏳ đang phân tích..."
-                answer_html = f'<div class="card-answer">Đáp: {html.escape(str(ans))}</div>'
+
             asr_snippets = asr_lookup.get((item.video_id, item.frame_id), [])
             asr_html = ""
             if asr_snippets:
                 joined_asr = " ".join(asr_snippets)
-                short_asr = (joined_asr[:65] + "...") if len(joined_asr) > 65 else joined_asr
+                short_asr = (joined_asr[:60] + "...") if len(joined_asr) > 60 else joined_asr
                 asr_html = (
-                    f'<div style="font-size:0.75rem; color:#3730a3; background:#e0e7ff; '
+                    f'<div style="font-size:0.73rem; color:#3730a3; background:#e0e7ff; '
                     f'border-radius:4px; padding:2px 4px; margin-top:3px; line-height:1.2;" '
                     f'title="{html.escape(joined_asr)}">🗣️ {html.escape(short_asr)}</div>'
                 )
+
+            ocr_labels = ocr_lookup.get((item.video_id, item.frame_id), [])
+            ocr_html = ""
+            if ocr_labels:
+                joined_ocr = ", ".join(ocr_labels[:4])
+                short_ocr = (joined_ocr[:55] + "...") if len(joined_ocr) > 55 else joined_ocr
+                ocr_html = (
+                    f'<div style="font-size:0.73rem; color:#047857; background:#d1fae5; '
+                    f'border-radius:4px; padding:2px 4px; margin-top:2px; line-height:1.2;" '
+                    f'title="{html.escape(", ".join(ocr_labels))}">🔤 {html.escape(short_ocr)}</div>'
+                )
+
             st.markdown(
                 f'<div class="card-meta">'
                 f'<span class="card-rank">#{idx + 1}</span> '
                 f'<span class="card-video">{html.escape(item.video_id)}</span><br>'
-                f"frame {item.frame_id} · score {item.score:.3f}"
-                f"{asr_html}"
-                f"{answer_html}</div>",
+                f"frame <b>{item.frame_id}</b> · score {item.score:.3f}"
+                f"{ocr_html}"
+                f"{asr_html}</div>",
                 unsafe_allow_html=True,
             )
 
@@ -938,49 +970,74 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
         lookup = {}
     map_dir = st.session_state.get("cfg_map_keyframes", DEFAULT_MAP_KEYFRAMES)
     videos_root = st.session_state.get("cfg_videos_root", DEFAULT_VIDEOS_ROOT)
+    nonce = int(st.session_state.get("_query_nonce", 0))
 
-    st.subheader(f"Gallery TRAKE ({len(visible)} video)")
+    n_events = len(query.events)
+    st.subheader(f"🎬 Kết quả TRAKE: {len(visible)} Cụm Video ({n_events} hành động tuần tự)")
+
     for idx, item in visible:
         is_sel = idx in selected
+        event_frames = item.event_frames or []
+
         st.markdown(
-            f'<div class="card-meta"><span class="card-rank">#{idx + 1}</span> '
-            f'<span class="card-video">{html.escape(item.video_id)}</span> · '
-            f"score {item.score:.3f}</div>",
+            f'<div style="background: rgba(255,255,255,0.75); border: 2px solid {"#c97aa6" if is_sel else "#e2e8f0"}; '
+            f'border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">'
+            f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">'
+            f'  <div><span style="font-weight:900; color:#4f46e5; font-size:1.15rem;">#{idx + 1}</span> '
+            f'  <span style="font-weight:800; font-size:1.05rem; margin-left:6px;">📹 Video: <code>{html.escape(item.video_id)}</code></span> · '
+            f'  <span style="font-size:0.88rem; color:#64748b;">Độ khớp chuỗi: <b>{item.score:.3f}</b></span></div>'
+            f'  <span style="background: #ede9fe; color:#6d28d9; padding: 3px 10px; border-radius: 999px; font-weight:700; font-size:0.78rem;">'
+            f'  Chuỗi {len(event_frames)} hành động</span>'
+            f'</div>',
             unsafe_allow_html=True,
         )
-        event_frames = item.event_frames or []
+
         if not event_frames:
             st.caption("Candidate này không có event_frames.")
         else:
-            if len(event_frames) != len(query.events):
-                st.caption(f"Số event frame: {len(event_frames)}/{len(query.events)}.")
-            rows = [event_frames[i : i + 4] for i in range(0, len(event_frames), 4)]
-            for row_start, row in enumerate(rows):
-                cols = st.columns(len(row))
-                for col_idx, (col, frame_id) in enumerate(zip(cols, row)):
-                    ev_idx = row_start * 4 + col_idx
-                    path = event_keyframe_file(item.video_id, frame_id, lookup, root)
-                    ev_text = query.events[ev_idx] if ev_idx < len(query.events) else f"Sự kiện {ev_idx + 1}"
-                    ev_ts = get_frame_timestamp(item.video_id, frame_id, map_dir)
-                    with col:
-                        if path and path.exists():
-                            st.markdown('<div class="hero-wrap">', unsafe_allow_html=True)
-                            st.image(str(path), use_container_width=True)
-                            st.markdown("</div>", unsafe_allow_html=True)
-                        else:
-                            st.caption("Không có ảnh")
-                        st.caption(f"**#{ev_idx + 1}: {html.escape(ev_text)}**\n`frame {frame_id}` ({format_timestamp(ev_ts)})")
-                        if st.button("🎬 Xem", key=f"trake_v_{nonce}_{idx}_{frame_id}", use_container_width=True, help=f"Phát video {item.video_id} tại {format_timestamp(ev_ts)}"):
-                            show_video_dialog(
-                                video_id=item.video_id,
-                                initial_frame_id=frame_id,
-                                manifest_path=manifest_path,
-                                keyframes_root=root,
-                                videos_root=videos_root,
-                                map_dir=map_dir,
-                            )
-        nonce = int(st.session_state.get("_query_nonce", 0))
-        st.checkbox("Chọn video này", key=f"sel_{nonce}_{idx}", value=(idx in selected), on_change=_toggle, args=(idx, nonce))
+            cols = st.columns(len(event_frames))
+            for ev_idx, (col, frame_id) in enumerate(zip(cols, event_frames)):
+                path = event_keyframe_file(item.video_id, frame_id, lookup, root)
+                ev_text = query.events[ev_idx] if ev_idx < len(query.events) else f"Hành động {ev_idx + 1}"
+                ev_ts = get_frame_timestamp(item.video_id, frame_id, map_dir)
+                with col:
+                    st.markdown(
+                        f'<div style="font-size:0.78rem; font-weight:800; color:#1e1b4b; background:#f1f5f9; '
+                        f'padding:3px 6px; border-radius:6px; margin-bottom:4px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" '
+                        f'title="{html.escape(ev_text)}">'
+                        f'#{ev_idx + 1}: {html.escape(ev_text)}</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if path and path.exists():
+                        st.markdown('<div class="hero-wrap">', unsafe_allow_html=True)
+                        st.image(str(path), use_container_width=True)
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    else:
+                        st.caption("Không có ảnh")
+                    st.caption(f"**`frame {frame_id}`** ({format_timestamp(ev_ts)})")
+                    if st.button("🎬 Xem", key=f"trake_v_{nonce}_{idx}_{frame_id}", use_container_width=True, help=f"Phát video tại {format_timestamp(ev_ts)}"):
+                        show_video_dialog(
+                            video_id=item.video_id,
+                            initial_frame_id=frame_id,
+                            manifest_path=manifest_path,
+                            keyframes_root=root,
+                            videos_root=videos_root,
+                            map_dir=map_dir,
+                        )
+
+        # Checkbox chọn cả cụm video này
+        c_sel_col1, c_sel_col2 = st.columns([3, 1])
+        with c_sel_col1:
+            st.caption(f"Dòng CSV nộp bài: `{item.video_id}, {', '.join(str(f) for f in event_frames)}`")
+        with c_sel_col2:
+            st.checkbox(
+                "✅ Chọn cụm này",
+                key=f"sel_{nonce}_{idx}",
+                value=is_sel,
+                on_change=_toggle,
+                args=(idx, nonce),
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
         st.divider()
 
 
@@ -1007,15 +1064,30 @@ st.markdown(
 # ===========================================================================
 st.markdown('<div class="topbar">', unsafe_allow_html=True)
 
-# --- Chọn luồng (NGOÀI form để Enter luôn hoạt động) ---
-q_col, rest_col = st.columns([1, 4.4], gap="small")
-with q_col:
-    st.markdown('<div class="mini-label">Luồng</div>', unsafe_allow_html=True)
+# --- Chọn luồng & Chế độ tìm kiếm (NGOÀI form để Enter luôn hoạt động) ---
+top_c1, top_c2 = st.columns([1.3, 3.1], gap="small")
+with top_c1:
+    st.markdown('<div class="mini-label">Luồng bài toán</div>', unsafe_allow_html=True)
     query_type = st.segmented_control(
         "Luồng",
         ["kis", "qa", "trake"],
         default="kis",
         key="query_type",
+        label_visibility="collapsed",
+    )
+with top_c2:
+    st.markdown('<div class="mini-label">Chế độ tìm kiếm (Modality)</div>', unsafe_allow_html=True)
+    search_mode = st.segmented_control(
+        "Chế độ",
+        ["hybrid", "siglip", "asr", "ocr"],
+        format_func=lambda x: {
+            "hybrid": "🌈 Đa kênh (Hybrid)",
+            "siglip": "👁️ Thị giác (SigLIP)",
+            "asr": "🗣️ Lời thoại (ASR)",
+            "ocr": "🔤 Chữ màn hình (OCR)",
+        }.get(x, x),
+        default="hybrid",
+        key="search_mode",
         label_visibility="collapsed",
     )
 
@@ -1044,33 +1116,32 @@ if query_type == "trake":
     )
 
 # --- Ô Query + nút Chạy trong CÙNG một form (Enter = submit) ---
-with rest_col:
-    with st.form("query_form", border=False):
-        t_col, run_col = st.columns([3.4, 1], gap="small")
-        with t_col:
-            st.markdown('<div class="mini-label">Query</div>', unsafe_allow_html=True)
-            text = st.text_input("Query", placeholder="Dán đề BTC vào đây (Enter để chạy)",
-                                 label_visibility="collapsed", key="query_text")
-        with run_col:
-            st.markdown('<div class="mini-label">&nbsp;</div>', unsafe_allow_html=True)
-            submitted = st.form_submit_button("Chạy Agent", type="primary", use_container_width=True)
-            if submitted:
-                st.session_state["_run_agent"] = True
+with st.form("query_form", border=False):
+    t_col, run_col = st.columns([3.8, 1], gap="small")
+    with t_col:
+        st.markdown('<div class="mini-label">Query tìm kiếm</div>', unsafe_allow_html=True)
+        text = st.text_input("Query", placeholder="Dán đề BTC vào đây (Enter để chạy)",
+                             label_visibility="collapsed", key="query_text")
+    with run_col:
+        st.markdown('<div class="mini-label">&nbsp;</div>', unsafe_allow_html=True)
+        submitted = st.form_submit_button("Chạy Agent", type="primary", use_container_width=True)
+        if submitted:
+            st.session_state["_run_agent"] = True
 
-    # Nút tùy chọn: dịch VI→EN trước khi retrieval. Mặc định TẮT (dùng query nguyên bản).
-    # Bật khi query nhập bằng tiếng Việt và muốn đảm bảo đầu vào CLIP (tiếng Anh).
-    translate_query = st.checkbox(
-        "🌐 Dịch VI→EN",
-        value=st.session_state.get("cfg_translate", False),
-        key="cfg_translate",
-        help=(
-            "Dịch truy vấn tiếng Việt sang tiếng Anh trước khi retrieval (CLIP text "
-            "encoder là tiếng Anh nên đầu vào tiếng Anh cho kết quả tốt hơn). "
-            "Mặc định TẮT — dùng query nguyên bản. Bật nếu bạn nhập tiếng Việt và "
-            "muốn hệ thống tự dịch. Khi tắt mà vẫn nhập tiếng Việt, retrieval có thể "
-            "ra frame sai do CLIP không hiểu tiếng Việt."
-        ),
-    )
+# Nút tùy chọn: dịch VI→EN trước khi retrieval. Mặc định TẮT (dùng query nguyên bản).
+# Bật khi query nhập bằng tiếng Việt và muốn đảm bảo đầu vào CLIP (tiếng Anh).
+translate_query = st.checkbox(
+    "🌐 Dịch VI→EN",
+    value=st.session_state.get("cfg_translate", False),
+    key="cfg_translate",
+    help=(
+        "Dịch truy vấn tiếng Việt sang tiếng Anh trước khi retrieval (CLIP text "
+        "encoder là tiếng Anh nên đầu vào tiếng Anh cho kết quả tốt hơn). "
+        "Mặc định TẮT — dùng query nguyên bản. Bật nếu bạn nhập tiếng Việt và "
+        "muốn hệ thống tự dịch. Khi tắt mà vẫn nhập tiếng Việt, retrieval có thể "
+        "ra frame sai do CLIP không hiểu tiếng Việt."
+    ),
+)
 
 if st.session_state.get("_run_agent"):
     st.session_state["_run_agent"] = False
@@ -1091,6 +1162,7 @@ if st.session_state.get("_run_agent"):
                     "ollama_url": st.session_state.get("cfg_ollama", "http://127.0.0.1:11434"),
                     "metadata_filter": st.session_state.get("cfg_filter", ""),
                     "translate_query": bool(st.session_state.get("cfg_translate", False)),
+                    "search_mode": str(st.session_state.get("search_mode", "hybrid") or "hybrid"),
                     "coarse_top_k": int(st.session_state.get("cfg_coarse_top_k", 200)),
                     "vlm_backend": st.session_state.get("cfg_vlm_backend", "florence"),
                     "vlm_model": st.session_state.get("cfg_vlm_model", "microsoft/Florence-2-base-ft"),
@@ -1100,37 +1172,21 @@ if st.session_state.get("_run_agent"):
                 }
                 backend_url = st.session_state.get("cfg_backend", "http://127.0.0.1:8000")
 
-                if query_type == "qa":
-                    # ---- Phase 1: retrieval nhanh (giống KIS), hiển gallery ảnh ngay ----
-                    with st.spinner("🔍 Đang tìm kiếm... (sẽ thấy ảnh ngay)"):
+                with st.spinner("🔍 PEGASUS đang tìm kiếm frame..."):
+                    if query_type == "qa":
                         result = run_backend_qa_phase1(query, runtime, backend_url)
-                    st.session_state.update(
-                        query=query,
-                        candidates=result.candidates,
-                        trace=result.trace,
-                        raw_root=st.session_state.get("cfg_root", "data/processed"),
-                        manifest_path=runtime["manifest_path"],
-                        selected=[],
-                        qa_answers_ready=False,   # phase 2 chưa chạy
-                        qa_question=question,
-                        qa_runtime=runtime,
-                        qa_backend_url=backend_url,
-                        _query_nonce=st.session_state.get("_query_nonce", 0) + 1,
-                    )
-                    st.rerun()
-                else:
-                    # KIS / TRAKE: giữ nguyên luồng cũ
-                    with st.spinner("Agent đang retrieval..."):
+                    else:
                         result = run_backend(query_type, query, runtime, backend_url)
-                    st.session_state.update(
-                        query=query,
-                        candidates=result.candidates,
-                        trace=result.trace,
-                        raw_root=st.session_state.get("cfg_root", "data/processed"),
-                        manifest_path=runtime["manifest_path"],
-                        selected=[],
-                        _query_nonce=st.session_state.get("_query_nonce", 0) + 1,
-                    )
+
+                st.session_state.update(
+                    query=query,
+                    candidates=result.candidates,
+                    trace=result.trace,
+                    raw_root=st.session_state.get("cfg_root", "data/processed"),
+                    manifest_path=runtime["manifest_path"],
+                    selected=[],
+                    _query_nonce=st.session_state.get("_query_nonce", 0) + 1,
+                )
 
                 # Bản dịch (giữ nguyên cho mọi luồng)
                 translated = None
@@ -1393,32 +1449,10 @@ else:
         visible = (chosen + rest)[:max_show]
 
         # ---- Gallery ảnh ----
-        if query.type == "TRAKE":
+        if query.type.lower() == "trake":
             _render_trake_gallery(query, visible, root, selected)
         else:
             _render_frame_gallery(query, visible, root, selected)
-
-        # ---- Phase 2: Chạy VLM song song cho QA ----
-        if query.type == "qa" and not st.session_state.get("qa_answers_ready", False):
-            vlm_q = st.session_state.get("qa_question")
-            vlm_rt = st.session_state.get("qa_runtime")
-            vlm_url = st.session_state.get("qa_backend_url")
-            if vlm_q and vlm_rt and vlm_url:
-                with st.spinner("🤖 VLM đang phân tích các video song song để tìm đáp án..."):
-                    try:
-                        answers = run_backend_qa_answers(
-                            question=vlm_q,
-                            candidates=candidates,
-                            runtime=vlm_rt,
-                            backend_url=vlm_url,
-                        )
-                        for c in candidates:
-                            if c.vector_id is not None and c.vector_id in answers:
-                                c.answer = answers[c.vector_id]
-                        st.session_state["qa_answers_ready"] = True
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Lỗi khi chạy VLM song song: {e}")
 
         # ---- Thanh xuất CSV chuẩn nộp bài BTC ----
         st.divider()
