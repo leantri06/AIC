@@ -108,8 +108,8 @@ def resolve_data_root_and_paths(base_str: str, model_choice: str = "siglip2") ->
         "clip-l14": {
             "clip_model": "ViT-L-14",
             "clip_pretrained": "openai",
-            "manifest_names": ["clip_manifest.jsonl", "siglip2_manifest.jsonl", "siglip_manifest.jsonl", "derived_manifest.jsonl"],
-            "feature_names": ["clip_features.npy", "siglip2_features.npy", "siglip_features.npy", "derived_features.npy"],
+            "manifest_names": ["derived_manifest.jsonl", "official_manifest.jsonl", "clip_manifest.jsonl", "siglip2_manifest.jsonl"],
+            "feature_names": ["derived_features.npy", "official_features.npy", "clip_features.npy", "siglip2_features.npy"],
         },
     }
     
@@ -1202,7 +1202,7 @@ with top_c3:
             "siglip2": "🚀 SigLIP 2 (SO400M - SOTA)",
             "siglip": "👁️ SigLIP (SO400M - Chuẩn)",
             "siglip2-base": "⚡ SigLIP 2 Base (ViT-B-16)",
-            "clip-l14": "🎨 OpenAI CLIP (ViT-L-14)",
+            "clip-l14": "🎨 OpenAI CLIP ViT-L-14 (Derived)",
         }.get(x, x),
         index=0,
         key="selected_model_choice",
@@ -1297,9 +1297,9 @@ with st.expander("📂 Cấu hình Thư mục Dữ liệu Gốc (Chỉ cần đi
     
     col_p1, col_p2 = st.columns(2)
     with col_p1:
-        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["manifest"]).exists() else "🔴"} Manifest ({model_choice})</span><span class="path-val" title="{auto_paths["manifest"]}">{auto_paths["manifest"]}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["features"]).exists() else "🔴"} Features ({model_choice})</span><span class="path-val" title="{auto_paths["features"]}">{auto_paths["features"]}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["asr_features"]).exists() else "⚪"} Dense ASR Features</span><span class="path-val" title="{auto_paths["asr_features"]}">{auto_paths["asr_features"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["manifest"]).exists() else "🔴"} Manifest ({model_choice})</span><span class="path-val" title="{auto_paths["manifest"]}">{Path(auto_paths["manifest"]).name}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["features"]).exists() else "🔴"} Features ({model_choice})</span><span class="path-val" title="{auto_paths["features"]}">{Path(auto_paths["features"]).name}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["asr_features"]).exists() else "⚪"} Dense ASR Features</span><span class="path-val" title="{auto_paths["asr_features"]}">{Path(auto_paths["asr_features"]).name}</span></div>', unsafe_allow_html=True)
     with col_p2:
         st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["keyframes"]).exists() else "🔴"} Keyframes Dir</span><span class="path-val" title="{auto_paths["keyframes"]}">{auto_paths["keyframes"]}</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["videos"]).exists() else "⚪"} Videos (.mp4) Dir</span><span class="path-val" title="{auto_paths["videos"]}">{auto_paths["videos"]}</span></div>', unsafe_allow_html=True)
@@ -1307,26 +1307,26 @@ with st.expander("📂 Cấu hình Thư mục Dữ liệu Gốc (Chỉ cần đi
 
     with st.expander("🔧 Tùy chỉnh chi tiết từng file riêng lẻ (Tùy chọn nâng cao)", expanded=False):
         st.text_input("Backend API", "http://127.0.0.1:8000", key="cfg_backend")
-        st.text_input("Manifest JSONL", auto_paths["manifest"], key="cfg_manifest")
-        st.text_input("Feature .npy", auto_paths["features"], key="cfg_features")
-        st.text_input("Dense ASR Feature .npy (BGE-M3)", auto_paths["asr_features"], key="cfg_asr_features")
+        st.text_input("Manifest JSONL (Tự động theo model)", auto_paths["manifest"], disabled=True)
+        st.text_input("Feature .npy (Tự động theo model)", auto_paths["features"], disabled=True)
+        st.text_input("Dense ASR Feature .npy (BGE-M3)", auto_paths["asr_features"], disabled=True)
         st.text_input("Root Keyframes", auto_paths["keyframes"], key="cfg_root")
         st.text_input("Root Videos (.mp4)", auto_paths["videos"], key="cfg_videos_root")
         st.text_input("Thư mục map-keyframes (.csv)", auto_paths["map_keyframes"], key="cfg_map_keyframes")
-        st.text_input("CLIP / SigLIP model", auto_paths["clip_model"], key="cfg_clip_model")
-        st.text_input("CLIP / SigLIP pretrained", auto_paths["clip_pretrained"], key="cfg_clip_pretrained")
+        st.text_input("CLIP / SigLIP model", auto_paths["clip_model"], disabled=True)
+        st.text_input("CLIP / SigLIP pretrained", auto_paths["clip_pretrained"], disabled=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Lấy các đường dẫn thực thi: Ưu tiên override nếu có, fallback về auto_paths
-active_manifest = st.session_state.get("cfg_manifest") or auto_paths["manifest"]
-active_features = st.session_state.get("cfg_features") or auto_paths["features"]
-active_asr_features = st.session_state.get("cfg_asr_features") or auto_paths["asr_features"]
+# Lấy các đường dẫn thực thi tự động theo model đang chọn
+active_manifest = auto_paths["manifest"]
+active_features = auto_paths["features"]
+active_asr_features = auto_paths["asr_features"]
 active_root = st.session_state.get("cfg_root") or auto_paths["keyframes"]
 active_videos_root = st.session_state.get("cfg_videos_root") or auto_paths["videos"]
 active_map_keyframes = st.session_state.get("cfg_map_keyframes") or auto_paths["map_keyframes"]
-active_clip_model = st.session_state.get("cfg_clip_model") or auto_paths["clip_model"]
-active_clip_pretrained = st.session_state.get("cfg_clip_pretrained") or auto_paths["clip_pretrained"]
+active_clip_model = auto_paths["clip_model"]
+active_clip_pretrained = auto_paths["clip_pretrained"]
 
 if st.session_state.get("_run_agent"):
     st.session_state["_run_agent"] = False
