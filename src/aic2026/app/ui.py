@@ -5,7 +5,9 @@ import os
 # Fix OpenMP duplicate lib runtime conflict on Windows (Error #15 / 0xC0000005)
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-if os.path.exists(r"D:\ai_challenge\data"):
+if os.path.exists(r"D:\bachkhoa\ai_challenge\data"):
+    os.environ.setdefault("HF_HOME", r"D:\bachkhoa\ai_challenge\data\.cache\huggingface")
+elif os.path.exists(r"D:\ai_challenge\data"):
     os.environ.setdefault("HF_HOME", r"D:\ai_challenge\data\.cache\huggingface")
 
 import csv
@@ -36,6 +38,18 @@ _VI_MARK_RE = _re.compile(
 def _is_english(text: str) -> bool:
     """True nếu text KHÔNG chứa ký tự tiếng Việt có dấu."""
     return not bool(_VI_MARK_RE.search(text or ""))
+
+
+# Helper to avoid Streamlit 1.40+ deprecation warnings for width/use_container_width
+_STREAMLIT_VERSION_PARTS = [int(p) for p in st.__version__.split(".")[:2] if p.isdigit()]
+_USE_WIDTH_STRETCH = bool(
+    _STREAMLIT_VERSION_PARTS
+    and (
+        _STREAMLIT_VERSION_PARTS[0] > 1
+        or (_STREAMLIT_VERSION_PARTS[0] == 1 and _STREAMLIT_VERSION_PARTS[1] >= 40)
+    )
+)
+_FULL_WIDTH = {"width": "stretch"} if _USE_WIDTH_STRETCH else {"use_container_width": True}
 
 
 class BackendRequestError(RuntimeError):
@@ -98,123 +112,163 @@ DEFAULT_CLIP_MODEL = "siglip2" if "siglip2" in DEFAULT_FEATURES else "ViT-SO400M
 DEFAULT_CLIP_PRETRAINED = "webli"
 
 
-st.set_page_config(page_title="PEGASUS", layout="wide")
+st.set_page_config(page_title="PEGASUS AI Challenge 2026", layout="wide", page_icon="🦄")
 
 st.markdown(
     """
 <style>
 :root{
-  --peg-violet:#a78bda; --peg-pink:#e3a3c4; --peg-cyan:#7fcdd9; --peg-amber:#f59e0b;
-  --peg-ink:#3b3660; --peg-muted:#7c7894; --peg-line:rgba(167,139,218,.20);
+  --peg-violet:#8b5cf6; --peg-pink:#ec4899; --peg-cyan:#06b6d4; --peg-amber:#f59e0b;
+  --peg-emerald:#10b981; --peg-ink:#1e1b4b; --peg-muted:#64748b; --peg-card-bg:rgba(255,255,255,0.82);
 }
-/* Nền gradient tím - hồng - xanh đã hạ bão hòa (pastel) + glow nhẹ */
-html, body, [data-testid="stAppViewContainer"] { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+/* Nền gradient hiện đại Glassmorphism + Glow mềm */
+html, body, [data-testid="stAppViewContainer"] { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 [data-testid="stAppViewContainer"] {
   background:
-    radial-gradient(900px 500px at 12% -5%, rgba(227,163,196,.16), transparent 60%),
-    radial-gradient(800px 500px at 95% 0%, rgba(127,205,217,.14), transparent 60%),
-    radial-gradient(700px 600px at 50% 110%, rgba(167,139,218,.16), transparent 60%),
-    linear-gradient(160deg, #f7f4fc 0%, #fbf3f8 45%, #f1fafc 100%);
+    radial-gradient(1000px 600px at 8% -5%, rgba(236,72,153,0.14), transparent 60%),
+    radial-gradient(900px 600px at 92% 0%, rgba(6,182,212,0.14), transparent 60%),
+    radial-gradient(800px 700px at 50% 115%, rgba(139,92,246,0.14), transparent 60%),
+    linear-gradient(165deg, #f8fafc 0%, #f5f3ff 40%, #f0fdfa 100%);
   background-attachment: fixed;
 }
 
-/* ---- Header (gradient pastel + sparkle) ---- */
-.peg-header { position:relative; display:flex; align-items:center; gap:.7rem; overflow:hidden;
-  background: linear-gradient(110deg, #a78bda 0%, #e3a3c4 50%, #7fcdd9 100%);
-  padding:.6rem 1rem; border-radius:.8rem;
-  box-shadow: 0 8px 20px rgba(167,139,218,.28); margin-bottom:.7rem; }
-.peg-header::after { content:"✦ ✧ ❉ ✦"; position:absolute; top:.35rem; right:.7rem;
-  font-size:.7rem; color:rgba(255,255,255,.7); letter-spacing:.3rem; }
-.peg-logo { display:flex; align-items:center; justify-content:center;
-  width:46px; height:46px; flex:0 0 auto; background:rgba(255,255,255,.30);
-  border-radius:.65rem; border:1px solid rgba(255,255,255,.55);
-  box-shadow: inset 0 0 8px rgba(255,255,255,.35); }
+/* ---- Header (Gradient Pastel + Glass Glow) ---- */
+.peg-header {
+  position:relative; display:flex; align-items:center; justify-content:space-between;
+  background: linear-gradient(115deg, #7c3aed 0%, #db2777 50%, #0891b2 100%);
+  padding:.75rem 1.25rem; border-radius:1rem;
+  box-shadow: 0 10px 25px -5px rgba(124,58,237,0.35); margin-bottom:.85rem;
+}
+.peg-header-left { display:flex; align-items:center; gap:.85rem; }
+.peg-logo {
+  display:flex; align-items:center; justify-content:center;
+  width:48px; height:48px; flex:0 0 auto; background:rgba(255,255,255,0.22);
+  border-radius:.75rem; border:1px solid rgba(255,255,255,0.45);
+  box-shadow: inset 0 0 10px rgba(255,255,255,0.3); backdrop-filter:blur(8px);
+}
 .peg-horse { width:34px; height:34px; display:block; }
-.peg-titles { display:flex; flex-direction:column; line-height:1.05; flex:1 1 auto; }
-.peg-word { font-size:1.35rem; font-weight:900; color:#fff; letter-spacing:.16em; margin:0;
-  text-shadow: 0 2px 8px rgba(80,60,120,.25); }
-.peg-sub { font-size:.66rem; color:rgba(255,255,255,.92); letter-spacing:.03em; margin-top:.1rem; }
-.peg-badge { background:rgba(255,255,255,.28); color:#fff; font-size:.66rem; font-weight:700;
-  padding:.28rem .55rem; border-radius:999px; border:1px solid rgba(255,255,255,.55);
-  white-space:nowrap; box-shadow:0 1px 6px rgba(80,60,120,.12); }
+.peg-titles { display:flex; flex-direction:column; line-height:1.1; }
+.peg-word { font-size:1.45rem; font-weight:900; color:#fff; letter-spacing:.12em; margin:0;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+.peg-sub { font-size:.72rem; color:rgba(255,255,255,0.92); font-weight:600; letter-spacing:.04em; margin-top:.15rem; }
+.peg-badge {
+  background:rgba(255,255,255,0.25); color:#fff; font-size:.7rem; font-weight:800;
+  padding:.35rem .75rem; border-radius:999px; border:1px solid rgba(255,255,255,0.5);
+  white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,0.1); backdrop-filter:blur(6px);
+}
 
-/* ---- Topbar (glassmorphism) ---- */
-.topbar { background:rgba(255,255,255,.55); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-  border:1px solid rgba(255,255,255,.7); border-radius:.8rem;
-  padding:.6rem .8rem; margin-bottom:.7rem; box-shadow:0 4px 14px rgba(167,139,218,.12); }
-.mini-label { font-size:.64rem; text-transform:uppercase; letter-spacing:.07em;
-  color:#8b6fb5; margin-bottom:.15rem; font-weight:800; }
+/* ---- Topbar Search Panel (Glassmorphism Card) ---- */
+.topbar {
+  background: rgba(255,255,255,0.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  border: 1px solid rgba(255,255,255,0.9); border-radius:1rem;
+  padding:.85rem 1rem; margin-bottom:.85rem; box-shadow:0 8px 24px -4px rgba(139,92,246,0.12);
+}
+.mini-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.08em;
+  color:#6366f1; margin-bottom:.25rem; font-weight:800; display:flex; align-items:center; gap:4px; }
 
-/* ---- Gallery cards (glass + gradient accent) ---- */
-.hero-wrap { border-radius:.6rem; overflow:hidden; border:1px solid rgba(255,255,255,.8);
-  box-shadow:0 2px 8px rgba(167,139,218,.14); transition: transform .2s ease, box-shadow .2s ease; }
-.hero-wrap:hover { transform:translateY(-4px) scale(1.02); box-shadow:0 12px 24px rgba(227,163,196,.30); }
-.hero-wrap img { display:block; width:100%; border-radius:0; }
-.card-meta { font-size:.72rem; color:#4a4668; line-height:1.3; margin-top:.35rem;
-  background:rgba(255,255,255,.7); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-  border:1px solid rgba(255,255,255,.8); border-left:3px solid #b9a0e0;
-  border-radius:.5rem; padding:.4rem .5rem; }
-.card-rank { font-weight:800; color:#c97aa6; }
-.card-video { font-weight:700; color:var(--peg-ink); }
-.card-answer { font-size:.7rem; background:linear-gradient(100deg,#f1fbfd,#fbeef7); color:#8a5a80;
-  border-radius:.35rem; padding:.2rem .45rem; margin-top:.3rem; display:inline-block;
-  max-width:100%; word-break:break-word; border:1px solid rgba(227,163,196,.30); }
-.small-muted { font-size:.75rem; color:var(--peg-muted); }
-.peg-pill { background:linear-gradient(100deg,#a78bda,#7fcdd9); color:#fff; font-size:.7rem; font-weight:700;
-  padding:.28rem .55rem; border-radius:999px; box-shadow:0 2px 8px rgba(167,139,218,.28); }
+/* ---- Gallery Cards (Modern Elevated Card with Floating Badges) ---- */
+.gallery-card-container {
+  background: rgba(255,255,255,0.82); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border: 1.5px solid rgba(226,232,240,0.8); border-radius: 12px;
+  padding: 8px; margin-bottom: 14px;
+  box-shadow: 0 4px 16px -2px rgba(0,0,0,0.06);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+  position: relative;
+}
+.gallery-card-container:hover {
+  transform: translateY(-5px) scale(1.015);
+  box-shadow: 0 14px 28px -4px rgba(139,92,246,0.22);
+  border-color: #c084fc;
+}
+.gallery-card-container.is-selected {
+  border: 2.5px solid #ec4899;
+  background: rgba(253,242,248,0.92);
+  box-shadow: 0 0 0 4px rgba(236,72,153,0.25), 0 14px 28px -4px rgba(236,72,153,0.3);
+}
 
-/* ---- Grid / form elements (dịu màu) ---- */
+/* Hero container + Floating Image Badges */
+.hero-wrap {
+  position: relative; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: #000;
+}
+.hero-wrap img { display:block; width:100%; height:auto; transition: transform 0.3s ease; }
+.hero-wrap:hover img { transform: scale(1.04); }
+
+.badge-time {
+  position: absolute; top: 6px; left: 6px; z-index: 3;
+  background: rgba(15,23,42,0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  color: #fff; font-size: 0.68rem; font-weight: 800; font-family: monospace;
+  padding: 2px 6px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.25);
+}
+.badge-score {
+  position: absolute; top: 6px; right: 6px; z-index: 3;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  font-size: 0.68rem; font-weight: 800;
+  padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.3);
+}
+.badge-score-high { background: rgba(16,185,129,0.88); color: #fff; }
+.badge-score-mid  { background: rgba(245,158,11,0.88); color: #fff; }
+.badge-score-low  { background: rgba(100,116,139,0.85); color: #fff; }
+
+.badge-selected-order {
+  position: absolute; bottom: 6px; right: 6px; z-index: 3;
+  background: linear-gradient(135deg, #ec4899, #be123c); color: #fff;
+  font-size: 0.72rem; font-weight: 900; padding: 2px 8px; border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(236,72,153,0.5); border: 1.5px solid #fff;
+}
+
+/* Card metadata info */
+.card-meta {
+  font-size: 0.73rem; color: #334155; line-height: 1.35; margin-top: 6px;
+  background: rgba(248,250,252,0.85); border-radius: 6px; padding: 5px 7px;
+  border: 1px solid rgba(226,232,240,0.8);
+}
+.card-rank { font-weight: 900; color: #7c3aed; font-size: 0.8rem; }
+.card-video { font-weight: 800; color: #0f172a; font-family: monospace; font-size: 0.8rem; }
+
+/* 1-Click Copy Button */
+.btn-copy-fast {
+  width: 100%; border: 1.5px solid #cbd5e1; background: #fff; color: #334155;
+  padding: 5px 0; border-radius: 6px; font-size: 0.75rem; font-weight: 700;
+  cursor: pointer; transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.btn-copy-fast:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
+.btn-copy-fast:active { transform: scale(0.96); }
+
+/* ---- Form Submit Button Gradient ---- */
 .stButton > button[data-testid="baseButton-primary"] {
-  background: linear-gradient(100deg,#a78bda 0%, #e3a3c4 55%, #7fcdd9 100%) !important;
-  color:#fff !important; font-weight:800 !important; letter-spacing:.04em;
-  border:none !important; border-radius:.65rem !important; padding:.55rem .5rem !important;
-  box-shadow: 0 6px 16px rgba(227,163,196,.30) !important;
-  transition: transform .15s ease, box-shadow .15s ease !important; }
+  background: linear-gradient(105deg, #7c3aed 0%, #db2777 55%, #0891b2 100%) !important;
+  color: #fff !important; font-weight: 900 !important; letter-spacing: .04em;
+  border: none !important; border-radius: .65rem !important; padding: .6rem .75rem !important;
+  box-shadow: 0 6px 18px rgba(219,39,119,0.35) !important;
+  transition: transform .15s ease, box-shadow .15s ease !important;
+}
 .stButton > button[data-testid="baseButton-primary"]:hover {
   transform: translateY(-2px) !important;
-  box-shadow: 0 10px 22px rgba(167,139,218,.42) !important; }
+  box-shadow: 0 10px 24px rgba(124,58,237,0.45) !important;
+}
 
-.stCheckbox > label { font-weight:700; color:var(--peg-ink); }
-input[type="checkbox"]:checked { accent-color:#c97aa6; }
-
-/* ---- Card clickable: toàn bộ ảnh là vùng bấm chọn (nút trong suốt phủ lên) ---- */
-.frame-card { position: relative; border-radius:.6rem; }
-.frame-card .stButton > button {
-  position:absolute; top:0; left:0; width:100%; height:100%; min-height:100%;
-  opacity:0; border:none; background:transparent; padding:0; margin:0; cursor:pointer; }
-.frame-card.selected .hero-wrap {
-  border:3px solid #c97aa6;
-  box-shadow:0 0 0 3px rgba(201,122,166,.35), 0 12px 24px rgba(227,163,196,.30); }
-.frame-card .frame-pick-hint {
-  position:absolute; top:.35rem; right:.35rem; z-index:2;
-  background:rgba(201,122,166,.92); color:#fff; font-size:.62rem; font-weight:800;
-  padding:.12rem .4rem; border-radius:999px; opacity:0; transition:opacity .15s ease; }
-.frame-card.selected .frame-pick-hint { opacity:1; }
-
-[data-testid="stSlider"] { color:#8b6fb5; }
-
-/* ---- Ô nhập liệu (text input) có viền đẹp ---- */
 .stTextInput > div > div > input {
-  border:1.5px solid #c9b6e8 !important; border-radius:.6rem !important;
-  background:rgba(255,255,255,.85) !important; color:var(--peg-ink) !important;
-  padding:.55rem .7rem !important; font-size:.9rem !important;
-  box-shadow:0 1px 4px rgba(167,139,218,.15) !important;
-  transition: border-color .15s ease, box-shadow .15s ease !important; }
-.stTextInput > div > div > input::placeholder { color:#a89fc4 !important; }
-.stTextInput > div > div > input:focus,
-.stTextInput > div > div > input:focus-visible {
-  border-color:#a78bda !important; outline:none !important;
-  box-shadow:0 0 0 3px rgba(167,139,218,.28) !important; }
+  border: 1.5px solid #cbd5e1 !important; border-radius: .65rem !important;
+  background: rgba(255,255,255,0.9) !important; color: #0f172a !important;
+  padding: .55rem .75rem !important; font-size: .92rem !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+  transition: border-color .15s ease, box-shadow .15s ease !important;
+}
+.stTextInput > div > div > input:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.25) !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Logo PEGASUS: đầu KỲ LÂN (unicorn) — path chuẩn từ Lucide Lab (license ISC),
-# vẽ nét (line-art) trắng trên nền xanh. Inline SVG, viewBox 0 0 24 24.
+# Logo PEGASUS: đầu KỲ LÂN (unicorn) — SVG line-art trắng
 PEGASUS_UNICORN_SVG = """
 <svg class="peg-horse" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-     stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+     stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
      aria-label="PEGASUS unicorn">
   <path d="m15.6 4.8 2.7 2.3M15.5 10S19 7 22 2c-6 2-10 5-10 5m-.5 5H11"/>
   <path d="M5 15a4 4 0 0 0 4 4h7.8l.3.3a3 3 0 0 0 4-4.46L12 7c0-3-1-5-1-5S8 3 8 7c-4 1-6 3-6 3"/>
@@ -252,7 +306,6 @@ def run_backend(task_type: str, query: Query, runtime: dict, backend_url: str):
             detail = exc.response.text
         raise BackendRequestError(f"Backend trả HTTP {exc.response.status_code}: {detail}") from exc
     except httpx.RequestError:
-        # Tự động chuyển sang chế độ chạy trực tiếp trong tiến trình (In-process Fallback)
         try:
             from aic2026.app.api import RuntimeConfig, TaskRequest, run_task
             task_req = TaskRequest(
@@ -283,7 +336,7 @@ def run_backend_qa_phase1(query: Query, runtime: dict, backend_url: str):
                 "events": query.events,
                 "runtime": runtime,
             },
-            timeout=120,  # retrieval thường xong trong 5-20s
+            timeout=120,
         )
         response.raise_for_status()
         return AgentResult.model_validate(response.json())
@@ -312,58 +365,12 @@ def run_backend_qa_phase1(query: Query, runtime: dict, backend_url: str):
         raise BackendRequestError("Backend không trả về dữ liệu hợp lệ.") from exc
 
 
-def run_backend_qa_answers(
-    question: str,
-    candidates: list[Candidate],
-    runtime: dict,
-    backend_url: str,
-) -> dict[int, str]:
-    """Phase-2 QA: gửi candidates lên backend, nhận {vector_id: answer} từ VLM song song."""
-    try:
-        response = httpx.post(
-            f"{backend_url.rstrip('/')}/tasks/qa/answers",
-            json={
-                "question": question,
-                "candidates": [c.model_dump() for c in candidates],
-                "runtime": runtime,
-            },
-            timeout=600,  # VLM có thể mất 2-5 phút với nhiều video
-        )
-        response.raise_for_status()
-        # API trả {str(vector_id): answer} → chuyển thành {int: answer}
-        raw = response.json()
-        return {int(k): v for k, v in raw.items()}
-    except httpx.TimeoutException as exc:
-        raise BackendRequestError("VLM quá thời gian (600s).") from exc
-    except httpx.HTTPStatusError as exc:
-        try:
-            detail = exc.response.json()
-        except json.JSONDecodeError:
-            detail = exc.response.text
-        raise BackendRequestError(f"Backend trả HTTP {exc.response.status_code}: {detail}") from exc
-    except httpx.RequestError:
-        try:
-            from aic2026.app.api import AnswerRequest, RuntimeConfig, run_qa_answers
-            ans_req = AnswerRequest(
-                question=question,
-                candidates=[c.model_dump() for c in candidates],
-                runtime=RuntimeConfig(**runtime) if isinstance(runtime, dict) else runtime,
-            )
-            raw = run_qa_answers(ans_req)
-            return {int(k): v for k, v in raw.items()}
-        except Exception as local_exc:
-            raise BackendRequestError(f"Lỗi khi chạy QA VLM trực tiếp: {local_exc}") from local_exc
-    except (json.JSONDecodeError, ValidationError) as exc:
-        raise BackendRequestError("Backend không trả về dữ liệu hợp lệ.") from exc
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 def parse_events(events_text: str, text: str = "") -> list[str]:
     raw_lines = [line.strip() for line in (events_text or "").splitlines() if line.strip()]
     if not raw_lines and text:
-        # Tự động bóc tách sự kiện từ text nếu ô events để trống
         raw_lines = [line.strip() for line in text.splitlines() if line.strip()]
         if len(raw_lines) == 1:
             parts = _re.split(r"(?:^|\s+)\d+[\s:.)-]+\s*", raw_lines[0])
@@ -411,6 +418,20 @@ def load_asr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
         }
     except Exception:
         return {}
+
+
+@st.cache_data(show_spinner=False)
+def load_video_asr_timeline(manifest_path: str, video_id: str) -> list[tuple[int, list[str]]]:
+    try:
+        records = load_manifest(Path(manifest_path))
+        timeline = []
+        for r in records:
+            if r.video_id == video_id and getattr(r, "asr_text", None):
+                timeline.append((r.frame_id, r.asr_text))
+        timeline.sort(key=lambda x: x[0])
+        return timeline
+    except Exception:
+        return []
 
 
 @st.cache_data(show_spinner=False)
@@ -467,11 +488,11 @@ def resolve_keyframe_path(stored_path: str, root: Path) -> Path:
         for candidate in (
             root / rel,
             root / "Keyframes" / rel,
+            Path(r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes") / rel,
+            Path(r"D:\bachkhoa\ai_challenge\data\extracted") / rel,
             Path(r"D:\ai_challenge\data\extracted\Keyframes") / rel,
             Path(r"D:\ai_challenge\data\extracted") / rel,
-            Path(r"D:\ai_challenge\data\raw\Keyframes") / rel,
             Path.cwd() / rel,
-            Path.cwd() / "data" / "raw" / rel,
             Path.cwd() / "data" / "extracted" / "Keyframes" / rel,
             Path.cwd() / "data" / "processed" / rel,
         ):
@@ -495,9 +516,10 @@ def event_keyframe_file(video_id: str, frame_id: int, lookup: dict[tuple[str, in
     for base in (
         root,
         root / "Keyframes",
+        Path(r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes"),
+        Path(r"D:\bachkhoa\ai_challenge\data\extracted"),
         Path(r"D:\ai_challenge\data\extracted\Keyframes"),
         Path(r"D:\ai_challenge\data\extracted"),
-        Path(r"D:\ai_challenge\data\raw\Keyframes"),
         Path.cwd() / "data" / "raw" / "Keyframes",
     ):
         for pattern in (f"{frame_id:03d}.jpg", f"{frame_id:04d}.jpg", f"{frame_id}.jpg"):
@@ -507,27 +529,7 @@ def event_keyframe_file(video_id: str, frame_id: int, lookup: dict[tuple[str, in
     return None
 
 
-def file_link(path: Path | None) -> str | None:
-    if not path or not path.exists():
-        return None
-    return path.resolve().as_uri()
-
-
-def build_btc_json(query: Query, candidates: list[Candidate], selected_idx: list[int]) -> list[dict]:
-    """Chỉ lấy candidate được tick, GIỮ NGUYÊN THỨ TỰ CHỌN (không sort score).
-
-    Thứ tự xuất = thứ tự user click (frame mới click nhất ở đầu).
-    """
-    picked = [candidates[i] for i in selected_idx if 0 <= i < len(candidates)]
-    return [competition_answer(query, c) for c in picked]
-
-
 def build_btc_csv(query: Query, candidates: list[Candidate], selected_idx: list[int]) -> str:
-    """Chỉ lấy candidate được tick, GIỮ NGUYÊN THỨ TỰ CHỌN (không sort score).
-
-    Thứ tự xuất = thứ tự user click (frame mới click nhất ở đầu). Trả về
-    text CSV thuần túy (không header row, LF), sẵn sàng tải về nộp bài.
-    """
     picked = [candidates[i] for i in selected_idx if 0 <= i < len(candidates)]
     return "\n".join(csv_row(query, c) for c in picked)
 
@@ -537,7 +539,6 @@ _PTS_CACHE: dict[str, dict[int, float]] = {}
 
 
 def resolve_video_file(video_id: str, custom_root: str | Path | None = None) -> Path | None:
-    """Tìm file video .mp4 trên đĩa cho video_id (có cache bộ nhớ đệm)."""
     clean_vid = video_id.strip()
     cache_key = f"{clean_vid}_{custom_root}"
     if cache_key in _VIDEO_FILE_CACHE:
@@ -550,11 +551,10 @@ def resolve_video_file(video_id: str, custom_root: str | Path | None = None) -> 
         roots.append(Path(custom_root))
     roots.extend([
         Path(DEFAULT_VIDEOS_ROOT),
+        Path(r"D:\bachkhoa\ai_challenge\data\extracted\Videos"),
         Path(r"D:\ai_challenge\data\extracted\Videos"),
-        Path(r"D:\ai_challenge\data\raw\Videos"),
         Path("data/extracted/Videos"),
         Path("data/raw/Videos"),
-        Path("data/Videos"),
     ])
 
     for r in roots:
@@ -572,7 +572,6 @@ def resolve_video_file(video_id: str, custom_root: str | Path | None = None) -> 
 
 
 def format_timestamp(seconds: float) -> str:
-    """Định dạng số giây thành chuỗi mm:ss.xx."""
     m = int(seconds // 60)
     s = int(seconds % 60)
     ms = int(round((seconds - int(seconds)) * 100))
@@ -580,7 +579,6 @@ def format_timestamp(seconds: float) -> str:
 
 
 def get_single_video_pts_map(video_id: str, map_dir: str | Path | None = None) -> dict[int, float]:
-    """Đọc trực tiếp 1 file CSV của video_id để lấy mốc thời gian (nhanh gấp 100x so với quét toàn bộ thư mục)."""
     clean_vid = video_id.strip()
     if clean_vid in _PTS_CACHE:
         return _PTS_CACHE[clean_vid]
@@ -588,10 +586,9 @@ def get_single_video_pts_map(video_id: str, map_dir: str | Path | None = None) -
     roots = [
         Path(map_dir) if map_dir else Path(DEFAULT_MAP_KEYFRAMES),
         Path(DEFAULT_MAP_KEYFRAMES),
+        Path(r"D:\bachkhoa\ai_challenge\data\extracted\map-keyframes"),
         Path(r"D:\ai_challenge\data\extracted\map-keyframes"),
-        Path(r"D:\ai_challenge\data\raw\map-keyframes"),
         Path("data/extracted/map-keyframes"),
-        Path("data/raw/map-keyframes"),
     ]
 
     for r in roots:
@@ -627,14 +624,13 @@ def get_frame_timestamp(
     map_dir: str | Path | None = None,
     default_fps: float = 25.0,
 ) -> float:
-    """Lấy mốc thời gian (giây) của frame_id trong video_id siêu tốc."""
     pts_map = get_single_video_pts_map(video_id, map_dir)
     if frame_id in pts_map:
         return pts_map[frame_id]
     return float(frame_id) / default_fps
 
 
-@st.dialog("🎬 Trình Xem Video & Keyframe Inspector", width="large")
+@st.dialog("🎬 Trình Xem Video & Keyframe Inspector Pro", width="large")
 def show_video_dialog(
     video_id: str,
     initial_frame_id: int,
@@ -643,7 +639,6 @@ def show_video_dialog(
     videos_root: str | None = None,
     map_dir: str | None = None,
 ) -> None:
-    """Modal Dialog phát video tại đúng mốc thời gian của keyframe và duyệt toàn bộ keyframes."""
     state_key = f"_cur_fid_{video_id}"
     if state_key not in st.session_state:
         st.session_state[state_key] = initial_frame_id
@@ -660,9 +655,6 @@ def show_video_dialog(
         f"### 📹 Video: `{video_id}` &nbsp;|&nbsp; Frame: `{current_fid}` &nbsp;|&nbsp; ⏱️ **{format_timestamp(ts)}** ({ts:.2f}s)"
     )
 
-    kfs_data = [{"fid": fid, "pts": get_frame_timestamp(video_id, fid, map_dir)} for fid in all_frames]
-    kfs_json_str = json.dumps(kfs_data)
-
     col_player, col_side = st.columns([3, 2], gap="medium")
 
     with col_player:
@@ -675,9 +667,7 @@ def show_video_dialog(
                 f"Hãy kiểm tra lại đường dẫn video trong 'Cấu hình nâng cao'."
             )
 
-        # -------------------------------------------------------------
-        # Live Frame Tracker Card & Nút Bấm Copy Chuột Siêu Tốc (Iframe thuần, 0 lag)
-        # -------------------------------------------------------------
+        # Tracker Frame HTML5
         tracker_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -687,33 +677,20 @@ def show_video_dialog(
 body {{ background: transparent; overflow: hidden; }}
 .card {{
     background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
-    border: 2px solid #6366f1;
-    border-radius: 10px;
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border: 1.5px solid #6366f1; border-radius: 8px;
+    padding: 8px 14px; display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
 }}
-.title {{ font-size: 0.72rem; color: #a5b4fc; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }}
-.frame-row {{ display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }}
-.frame-label {{ font-size: 0.9rem; color: #cbd5e1; font-weight: 600; }}
-.frame-val {{ font-size: 1.55rem; font-weight: 900; color: #fbbf24; font-family: monospace; background: rgba(0,0,0,0.55); padding: 1px 8px; border-radius: 6px; border: 1px solid rgba(251,191,36,0.3); }}
-.time-val {{ font-size: 0.85rem; color: #94a3b8; font-weight: 500; }}
+.title {{ font-size: 0.7rem; color: #a5b4fc; font-weight: 800; text-transform: uppercase; }}
+.frame-row {{ display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }}
+.frame-label {{ font-size: 0.85rem; color: #cbd5e1; font-weight: 600; }}
+.frame-val {{ font-size: 1.4rem; font-weight: 900; color: #fbbf24; font-family: monospace; background: rgba(0,0,0,0.55); padding: 1px 7px; border-radius: 5px; }}
+.time-val {{ font-size: 0.8rem; color: #94a3b8; font-weight: 500; }}
 .btn-copy {{
     background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
-    color: white;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-weight: 800;
-    font-size: 0.95rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.4);
-    transition: transform 0.1s, background 0.2s;
+    color: white; border: none; padding: 8px 16px; border-radius: 7px;
+    font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    box-shadow: 0 4px 10px rgba(225, 29, 72, 0.4);
 }}
 .btn-copy:active {{ transform: scale(0.96); }}
 </style>
@@ -721,7 +698,7 @@ body {{ background: transparent; overflow: hidden; }}
 <body>
 <div class="card">
     <div>
-        <div class="title">⚡ FRAME ĐANG PHÁT HIỆN TẠI (LIVE TRACKER)</div>
+        <div class="title">⚡ FRAME LIVE ĐANG PHÁT</div>
         <div class="frame-row">
             <span class="frame-label">Frame:</span>
             <span id="live-frame" class="frame-val">{current_fid}</span>
@@ -729,7 +706,7 @@ body {{ background: transparent; overflow: hidden; }}
         </div>
     </div>
     <button class="btn-copy" id="btn-copy" onclick="doCopy()">
-        <span style="font-size: 1.1rem;">📋</span>
+        <span>📋</span>
         <span id="btn-text">BẤM COPY FRAME NÀY</span>
     </button>
 </div>
@@ -810,144 +787,154 @@ setInterval(update, 200);
 </script>
 </body>
 </html>"""
-        components.html(tracker_html, height=75)
+        components.html(tracker_html, height=72)
 
-        # Hộp copy dự phòng chuẩn BTC trực tiếp trên Streamlit
         st.text_input("📋 Chuỗi nộp bài chuẩn BTC (Video, Frame):", value=f"{video_id}, {current_fid}", key=f"txt_cur_val_{video_id}_{current_fid}")
-
-        asr_snippets = asr_lookup.get((video_id, current_fid), [])
-        if asr_snippets:
-            st.info(f"🗣️ **Lời thoại ASR:** {' '.join(asr_snippets)}")
 
     with col_side:
         kf_path = event_keyframe_file(video_id, current_fid, lookup, keyframes_root or Path("data/processed"))
         if kf_path and kf_path.exists():
-            st.image(str(kf_path), use_container_width=True, caption=f"Keyframe: {current_fid} ({format_timestamp(ts)})")
+            st.image(str(kf_path), **_FULL_WIDTH, caption=f"Keyframe: {current_fid} ({format_timestamp(ts)})")
         else:
             st.caption("Không có ảnh keyframe")
 
-        # Nút chuyển frame trước / sau trong video
         if len(all_frames) > 1 and current_fid in all_frames:
             curr_idx = all_frames.index(current_fid)
             c_prev, c_next = st.columns(2)
             with c_prev:
                 if curr_idx > 0:
                     prev_fid = all_frames[curr_idx - 1]
-                    if st.button(f"⏮️ Frame trước ({prev_fid})", key=f"btn_prev_{video_id}", use_container_width=True):
+                    if st.button(f"⏮️ Frame trước ({prev_fid})", key=f"btn_prev_{video_id}", **_FULL_WIDTH):
                         st.session_state[state_key] = prev_fid
                         st.rerun()
             with c_next:
                 if curr_idx < len(all_frames) - 1:
                     next_fid = all_frames[curr_idx + 1]
-                    if st.button(f"⏭️ Frame sau ({next_fid})", key=f"btn_next_{video_id}", use_container_width=True):
+                    if st.button(f"⏭️ Frame sau ({next_fid})", key=f"btn_next_{video_id}", **_FULL_WIDTH):
                         st.session_state[state_key] = next_fid
                         st.rerun()
 
-    # Section: Keyframe Inspector của video đang mở (Tối ưu tải siêu nhanh)
+    # Section Tabs: Keyframes & Lời thoại ASR toàn video
     st.markdown("---")
-    st.markdown(f"#### 🎞️ Keyframes lân cận của video `{video_id}` ({len(all_frames)} keyframes tổng)")
+    tab_kfs, tab_asr = st.tabs([f"🎞️ Keyframes ({len(all_frames)} frames)", "🗣️ Kịch bản Lời thoại ASR Toàn Video"])
 
-    cols_per_row = 6
-    curr_idx = all_frames.index(current_fid) if current_fid in all_frames else 0
-    # Lấy 12 frame lân cận gần nhất để mở modal tức thì trong chớp mắt
-    start_idx = max(0, curr_idx - 5)
-    end_idx = min(len(all_frames), start_idx + 12)
-    slice_frames = all_frames[start_idx:end_idx]
+    with tab_kfs:
+        cols_per_row = 6
+        curr_idx = all_frames.index(current_fid) if current_fid in all_frames else 0
+        start_idx = max(0, curr_idx - 5)
+        end_idx = min(len(all_frames), start_idx + 12)
+        slice_frames = all_frames[start_idx:end_idx]
 
-    def _render_kf_row(frames_chunk: list[int], prefix: str = "adj", offset: int = 0):
-        cols = st.columns(len(frames_chunk))
-        for c_idx, fid in enumerate(frames_chunk):
-            idx_key = offset + c_idx
-            with cols[c_idx]:
-                f_ts = get_frame_timestamp(video_id, fid, map_dir)
-                f_path = event_keyframe_file(video_id, fid, lookup, keyframes_root or Path("data/processed"))
-                is_active = (fid == current_fid)
-                if f_path and f_path.exists():
-                    st.image(str(f_path), use_container_width=True)
-                st.caption(f"{'👉 ' if is_active else ''}**`{fid}`** ({format_timestamp(f_ts)})")
-                
-                c_k1, c_k2 = st.columns(2)
-                with c_k1:
-                    if not is_active:
-                        if st.button("▶️", key=f"kf_jump_{prefix}_{video_id}_{fid}_{idx_key}", use_container_width=True, help=f"Nhảy video tới frame {fid}"):
-                            st.session_state[state_key] = fid
-                            st.rerun()
-                with c_k2:
-                    st.markdown(
-                        f"""<button onclick="navigator.clipboard.writeText('{html.escape(video_id)}, {fid}'); this.innerText='✅';"
-                                   style="width:100%; font-size:0.75rem; padding:4px 0; background:#374151; color:white; border:none; border-radius:4px; cursor:pointer;"
-                                   title="Copy '{video_id}, {fid}'">📋</button>""",
-                        unsafe_allow_html=True,
-                    )
+        def _render_kf_row(frames_chunk: list[int], prefix: str = "adj", offset: int = 0):
+            cols = st.columns(len(frames_chunk))
+            for c_idx, fid in enumerate(frames_chunk):
+                idx_key = offset + c_idx
+                with cols[c_idx]:
+                    f_ts = get_frame_timestamp(video_id, fid, map_dir)
+                    f_path = event_keyframe_file(video_id, fid, lookup, keyframes_root or Path("data/processed"))
+                    is_active = (fid == current_fid)
+                    if f_path and f_path.exists():
+                        st.image(str(f_path), **_FULL_WIDTH)
+                    st.caption(f"{'👉 ' if is_active else ''}**`{fid}`** ({format_timestamp(f_ts)})")
+                    
+                    c_k1, c_k2 = st.columns(2)
+                    with c_k1:
+                        if not is_active:
+                            if st.button("▶️", key=f"kf_jump_{prefix}_{video_id}_{fid}_{idx_key}", **_FULL_WIDTH, help=f"Nhảy video tới frame {fid}"):
+                                st.session_state[state_key] = fid
+                                st.rerun()
+                    with c_k2:
+                        st.markdown(
+                            f"""<button onclick="navigator.clipboard.writeText('{html.escape(video_id)}, {fid}'); this.innerText='✅';"
+                                       style="width:100%; font-size:0.75rem; padding:4px 0; background:#374151; color:white; border:none; border-radius:4px; cursor:pointer;"
+                                       title="Copy '{video_id}, {fid}'">📋</button>""",
+                            unsafe_allow_html=True,
+                        )
 
-    for row_start in range(0, len(slice_frames), cols_per_row):
-        _render_kf_row(slice_frames[row_start : row_start + cols_per_row], prefix="adj", offset=row_start)
+        for row_start in range(0, len(slice_frames), cols_per_row):
+            _render_kf_row(slice_frames[row_start : row_start + cols_per_row], prefix="adj", offset=row_start)
 
-    if len(all_frames) > len(slice_frames):
-        with st.expander(f"📂 Xem toàn bộ {len(all_frames)} keyframes của video `{video_id}`", expanded=False):
-            for row_start in range(0, len(all_frames), cols_per_row):
-                _render_kf_row(all_frames[row_start : row_start + cols_per_row], prefix="all", offset=row_start)
+        if len(all_frames) > len(slice_frames):
+            with st.expander(f"📂 Xem toàn bộ {len(all_frames)} keyframes của video `{video_id}`", expanded=False):
+                for row_start in range(0, len(all_frames), cols_per_row):
+                    _render_kf_row(all_frames[row_start : row_start + cols_per_row], prefix="all", offset=row_start)
+
+    with tab_asr:
+        video_timeline = load_video_asr_timeline(manifest_path, video_id)
+        if not video_timeline:
+            st.caption("Video này không có dữ liệu lời thoại ASR.")
+        else:
+            for fid_asr, texts in video_timeline:
+                asr_ts = get_frame_timestamp(video_id, fid_asr, map_dir)
+                c_t1, c_t2 = st.columns([1, 4])
+                with c_t1:
+                    if st.button(f"⏱️ {format_timestamp(asr_ts)} (f{fid_asr})", key=f"btn_jump_asr_{video_id}_{fid_asr}", **_FULL_WIDTH):
+                        st.session_state[state_key] = fid_asr
+                        st.rerun()
+                with c_t2:
+                    st.markdown(f"🗣️ *{' '.join(texts)}*")
 
 
 # ---------------------------------------------------------------------------
-# Gallery renderers (với checkbox chọn) — định nghĩa TRƯỚC phần gọi gallery
-# để tránh NameError khi Streamlit thực thi tuần tự từ trên xuống.
+# Gallery renderers
 # ---------------------------------------------------------------------------
 def _toggle(idx: int, nonce: int):
-    # Checkbox tự quản lý trạng thái qua key "sel_{nonce}_{idx}";
-    # mình đồng bộ ngược lại vào danh sách "selected" CÓ THỨ TỰ.
-    # Frame CHỌN ĐẦU TIÊN nằm TRÊN CÙNG (top 1) của danh sách xuất ra — vì nó
-    # là ưu tiên cao nhất. Các frame chọn sau nối TIẾP xuống dưới (giữ nguyên
-    # thứ tự chọn đầu→cuối = trên→dưới). Bỏ tick thì loại khỏi danh sách.
-    # `nonce` thay đổi mỗi lần chạy query mới → key checkbox hoàn toàn mới →
-    # không bao giờ nhớ tick của query trước (reset cứng, không phụ thuộc xóa state).
     checked = st.session_state.get(f"sel_{nonce}_{idx}", False)
     s = st.session_state["selected"]
     if checked:
         if idx not in s:
             if not s:
-                s.insert(0, idx)      # frame đầu chọn → trên cùng (top 1)
+                s.insert(0, idx)
             else:
-                s.append(idx)          # chọn sau → nối tiếp phía dưới
+                s.append(idx)
     else:
         if idx in s:
             s.remove(idx)
 
 
 def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], root: Path, selected: list[int]) -> None:
-    # nonce thay đổi mỗi query mới → key checkbox "sel_{nonce}_{idx}" luôn mới,
-    # không nhớ tick của query trước (reset cứng).
-    nonce = int(st.session_state.get("_query_nonce", 0))
     manifest_path = st.session_state.get("manifest_path")
     asr_lookup = load_asr_lookup(manifest_path) if manifest_path else {}
     ocr_lookup = load_ocr_lookup(manifest_path) if manifest_path else {}
-    lookup = load_keyframe_lookup(manifest_path) if manifest_path else {}
     map_dir = st.session_state.get("cfg_map_keyframes", DEFAULT_MAP_KEYFRAMES)
     videos_root = st.session_state.get("cfg_videos_root", DEFAULT_VIDEOS_ROOT)
+    nonce = int(st.session_state.get("_query_nonce", 0))
 
     st.subheader(f"🖼️ Gallery Kết quả ({len(visible)} ảnh keyframe)")
     grid = st.columns(5)
     for pos, (idx, item) in enumerate(visible):
         path = keyframe_file(item, root)
         ts = get_frame_timestamp(item.video_id, item.frame_id, map_dir)
+        is_sel = idx in selected
+        sel_order = (selected.index(idx) + 1) if is_sel else None
+
+        score_class = "badge-score-high" if item.score >= 0.7 else ("badge-score-mid" if item.score >= 0.45 else "badge-score-low")
+        order_html = f'<span class="badge-selected-order">#{sel_order}</span>' if is_sel else ''
+
         with grid[pos % 5]:
+            card_extra_class = " is-selected" if is_sel else ""
+            st.markdown(f'<div class="gallery-card-container{card_extra_class}" data-video-id="{html.escape(item.video_id)}">', unsafe_allow_html=True)
+            
             if path and path.exists():
-                st.markdown(f'<div class="gallery-card-container" data-video-id="{html.escape(item.video_id)}">', unsafe_allow_html=True)
-                st.markdown('<div class="hero-wrap">', unsafe_allow_html=True)
-                st.image(str(path), use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="hero-wrap">'
+                    f'<span class="badge-time">⏱️ {format_timestamp(ts)}</span>'
+                    f'<span class="badge-score {score_class}">🎯 {item.score:.3f}</span>'
+                    f'{order_html}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.image(str(path), **_FULL_WIDTH)
             else:
-                st.markdown(f'<div class="gallery-card-container" data-video-id="{html.escape(item.video_id)}">', unsafe_allow_html=True)
                 st.caption("Không có ảnh")
 
             asr_snippets = asr_lookup.get((item.video_id, item.frame_id), [])
             asr_html = ""
             if asr_snippets:
                 joined_asr = " ".join(asr_snippets)
-                short_asr = (joined_asr[:60] + "...") if len(joined_asr) > 60 else joined_asr
+                short_asr = (joined_asr[:55] + "...") if len(joined_asr) > 55 else joined_asr
                 asr_html = (
-                    f'<div style="font-size:0.73rem; color:#3730a3; background:#e0e7ff; '
-                    f'border-radius:4px; padding:2px 4px; margin-top:3px; line-height:1.2;" '
+                    f'<div style="font-size:0.72rem; color:#3730a3; background:#e0e7ff; '
+                    f'border-radius:4px; padding:2px 5px; margin-top:3px; line-height:1.2;" '
                     f'title="{html.escape(joined_asr)}">🗣️ {html.escape(short_asr)}</div>'
                 )
 
@@ -955,10 +942,10 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
             ocr_html = ""
             if ocr_labels:
                 joined_ocr = ", ".join(ocr_labels[:4])
-                short_ocr = (joined_ocr[:55] + "...") if len(joined_ocr) > 55 else joined_ocr
+                short_ocr = (joined_ocr[:50] + "...") if len(joined_ocr) > 50 else joined_ocr
                 ocr_html = (
-                    f'<div style="font-size:0.73rem; color:#047857; background:#d1fae5; '
-                    f'border-radius:4px; padding:2px 4px; margin-top:2px; line-height:1.2;" '
+                    f'<div style="font-size:0.72rem; color:#047857; background:#d1fae5; '
+                    f'border-radius:4px; padding:2px 5px; margin-top:2px; line-height:1.2;" '
                     f'title="{html.escape(", ".join(ocr_labels))}">🔤 {html.escape(short_ocr)}</div>'
                 )
 
@@ -968,28 +955,27 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
             if judge_score is not None:
                 badge_bg = "#ecfdf5" if float(judge_score) >= 70 else "#fef3c7"
                 badge_color = "#065f46" if float(judge_score) >= 70 else "#92400e"
-                judge_label = "🎯 Bằng chứng QA" if query_type == "qa" else ("⏱️ Chuỗi TRAKE" if query_type == "trake" else "⚖️ VLM Judge")
+                judge_label = "🎯 Bằng chứng QA" if query.type == "qa" else "⚖️ VLM Judge"
                 judge_html = (
-                    f'<div style="font-size:0.73rem; font-weight:700; color:{badge_color}; background:{badge_bg}; '
-                    f'border-radius:4px; padding:2px 4px; margin-top:2px; line-height:1.2;" '
+                    f'<div style="font-size:0.72rem; font-weight:700; color:{badge_color}; background:{badge_bg}; '
+                    f'border-radius:4px; padding:2px 5px; margin-top:2px; line-height:1.2;" '
                     f'title="{html.escape(str(judge_reason or ""))}">{judge_label}: {float(judge_score):.0f}/100</div>'
                 )
 
             st.markdown(
                 f'<div class="card-meta">'
-                f'<span class="card-rank">#{idx + 1}</span> '
-                f'<span class="card-video">{html.escape(item.video_id)}</span><br>'
-                f"frame <b>{item.frame_id}</b> · score {item.score:.3f}"
+                f'<span class="card-rank">#{idx + 1}</span> &nbsp;'
+                f'<span class="card-video">{html.escape(item.video_id)}</span> · <b>{item.frame_id}</b>'
                 f"{judge_html}"
                 f"{ocr_html}"
                 f"{asr_html}</div>",
                 unsafe_allow_html=True,
             )
 
-            # Nút Xem Video & Checkbox chọn
-            c_vid, c_chk = st.columns([3, 1], gap="small")
+            # Action bar: Xem Video, 1-Click Copy, Checkbox chọn
+            c_vid, c_cp, c_chk = st.columns([2.2, 1.3, 1.1], gap="small")
             with c_vid:
-                if st.button(f"🎬 Video ({format_timestamp(ts)})", key=f"btn_v_{nonce}_{idx}", use_container_width=True, help=f"Mở video {item.video_id} tại {format_timestamp(ts)} & duyệt keyframes"):
+                if st.button(f"🎬 Xem ({format_timestamp(ts)})", key=f"btn_v_{nonce}_{idx}", **_FULL_WIDTH, help=f"Mở video {item.video_id} tại {format_timestamp(ts)}"):
                     show_video_dialog(
                         video_id=item.video_id,
                         initial_frame_id=item.frame_id,
@@ -998,17 +984,19 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                         videos_root=videos_root,
                         map_dir=map_dir,
                     )
+            with c_cp:
+                st.markdown(
+                    f"""<button class="btn-copy-fast" onclick="navigator.clipboard.writeText('{html.escape(item.video_id)}, {item.frame_id}'); this.innerText='✅ Copied'; setTimeout(() => this.innerText='📋 Copy', 1500);" title="Copy '{item.video_id}, {item.frame_id}'">📋 Copy</button>""",
+                    unsafe_allow_html=True,
+                )
             with c_chk:
-                st.checkbox("Chọn", key=f"sel_{nonce}_{idx}", value=(idx in selected), on_change=_toggle, args=(idx, nonce), label_visibility="collapsed")
+                st.checkbox("Chọn", key=f"sel_{nonce}_{idx}", value=is_sel, on_change=_toggle, args=(idx, nonce), label_visibility="collapsed")
             st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], root: Path, selected: list[int]) -> None:
-    try:
-        manifest_path = st.session_state.get("manifest_path")
-        lookup = load_keyframe_lookup(manifest_path) if manifest_path else {}
-    except (FileNotFoundError, ValueError):
-        lookup = {}
+    manifest_path = st.session_state.get("manifest_path")
+    lookup = load_keyframe_lookup(manifest_path) if manifest_path else {}
     map_dir = st.session_state.get("cfg_map_keyframes", DEFAULT_MAP_KEYFRAMES)
     videos_root = st.session_state.get("cfg_videos_root", DEFAULT_VIDEOS_ROOT)
     nonce = int(st.session_state.get("_query_nonce", 0))
@@ -1018,17 +1006,18 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
 
     for idx, item in visible:
         is_sel = idx in selected
+        sel_order = (selected.index(idx) + 1) if is_sel else None
         event_frames = item.event_frames or []
 
         st.markdown(
-            f'<div style="background: rgba(255,255,255,0.75); border: 2px solid {"#c97aa6" if is_sel else "#e2e8f0"}; '
-            f'border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">'
+            f'<div style="background: rgba(255,255,255,0.85); border: 2px solid {"#ec4899" if is_sel else "#e2e8f0"}; '
+            f'border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">'
             f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">'
-            f'  <div><span style="font-weight:900; color:#4f46e5; font-size:1.15rem;">#{idx + 1}</span> '
+            f'  <div><span style="font-weight:900; color:#7c3aed; font-size:1.15rem;">#{idx + 1}</span> '
             f'  <span style="font-weight:800; font-size:1.05rem; margin-left:6px;">📹 Video: <code>{html.escape(item.video_id)}</code></span> · '
             f'  <span style="font-size:0.88rem; color:#64748b;">Độ khớp chuỗi: <b>{item.score:.3f}</b></span></div>'
             f'  <span style="background: #ede9fe; color:#6d28d9; padding: 3px 10px; border-radius: 999px; font-weight:700; font-size:0.78rem;">'
-            f'  Chuỗi {len(event_frames)} hành động</span>'
+            f'  Chuỗi {len(event_frames)} hành động {f"(Chọn #{sel_order})" if is_sel else ""}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1050,13 +1039,16 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                         unsafe_allow_html=True,
                     )
                     if path and path.exists():
-                        st.markdown('<div class="hero-wrap">', unsafe_allow_html=True)
-                        st.image(str(path), use_container_width=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="hero-wrap">'
+                            f'<span class="badge-time">⏱️ {format_timestamp(ev_ts)}</span></div>',
+                            unsafe_allow_html=True,
+                        )
+                        st.image(str(path), **_FULL_WIDTH)
                     else:
                         st.caption("Không có ảnh")
                     st.caption(f"**`frame {frame_id}`** ({format_timestamp(ev_ts)})")
-                    if st.button("🎬 Xem", key=f"trake_v_{nonce}_{idx}_{frame_id}", use_container_width=True, help=f"Phát video tại {format_timestamp(ev_ts)}"):
+                    if st.button("🎬 Xem", key=f"trake_v_{nonce}_{idx}_{frame_id}", **_FULL_WIDTH, help=f"Phát video tại {format_timestamp(ev_ts)}"):
                         show_video_dialog(
                             video_id=item.video_id,
                             initial_frame_id=frame_id,
@@ -1066,7 +1058,6 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                             map_dir=map_dir,
                         )
 
-        # Checkbox chọn cả cụm video này
         c_sel_col1, c_sel_col2 = st.columns([3, 1])
         with c_sel_col1:
             st.caption(f"Dòng CSV nộp bài: `{item.video_id}, {', '.join(str(f) for f in event_frames)}`")
@@ -1079,7 +1070,6 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                 args=(idx, nonce),
             )
         st.markdown('</div>', unsafe_allow_html=True)
-        st.divider()
 
 
 # ---------------------------------------------------------------------------
@@ -1087,28 +1077,29 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
 # ---------------------------------------------------------------------------
 st.markdown(
     '<div class="peg-header">'
+    '<div class="peg-header-left">'
     '<div class="peg-logo">'
     f"{PEGASUS_UNICORN_SVG}"
     "</div>"
     '<div class="peg-titles">'
     '<h1 class="peg-word">PEGASUS</h1>'
-    '<span class="peg-sub">AI Challenge 2026</span>'
+    '<span class="peg-sub">Video Retrieval AI Challenge 2026</span>'
     "</div>"
-    '<span class="peg-badge">KHÔNG THẮNG THÌ THÔI</span>'
+    "</div>"
+    '<span class="peg-badge">🏆 KHÔNG THẮNG THÌ THÔI</span>'
     "</div>",
     unsafe_allow_html=True,
 )
 
 
 # ===========================================================================
-# HÀNG TRÊN: NHẬP & CHẠY (3 khung cân đối: Luồng – Query – Chạy Agent)
+# TOPBAR SEARCH PANEL
 # ===========================================================================
 st.markdown('<div class="topbar">', unsafe_allow_html=True)
 
-# --- Chọn luồng & Chế độ tìm kiếm (NGOÀI form để Enter luôn hoạt động) ---
 top_c1, top_c2 = st.columns([1.3, 3.1], gap="small")
 with top_c1:
-    st.markdown('<div class="mini-label">Luồng bài toán</div>', unsafe_allow_html=True)
+    st.markdown('<div class="mini-label">🎯 Luồng bài toán</div>', unsafe_allow_html=True)
     query_type = st.segmented_control(
         "Luồng",
         ["kis", "qa", "trake"],
@@ -1117,7 +1108,7 @@ with top_c1:
         label_visibility="collapsed",
     )
 with top_c2:
-    st.markdown('<div class="mini-label">Chế độ tìm kiếm (Modality)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="mini-label">⚡ Chế độ tìm kiếm (Modality)</div>', unsafe_allow_html=True)
     search_mode = st.segmented_control(
         "Chế độ",
         ["hybrid", "siglip", "asr", "ocr"],
@@ -1132,11 +1123,10 @@ with top_c2:
         label_visibility="collapsed",
     )
 
-# Input phụ (Q&A / TRAKE) — cũng ngoài form để cập nhật ngay khi gõ
 question = ""
 events_text = ""
 if query_type == "qa":
-    question = st.text_input("Câu hỏi Q&A", placeholder="Ví dụ: Có bao nhiêu người?", label_visibility="collapsed",
+    question = st.text_input("Câu hỏi Q&A", placeholder="Ví dụ: Xe màu gì? Có bao nhiêu người?", label_visibility="collapsed",
                              key="query_question")
 if query_type == "trake":
     events_text = st.text_area(
@@ -1146,48 +1136,69 @@ if query_type == "trake":
             "The person sits down\n"
             "The person starts speaking"
         ),
-        height=140,
+        height=120,
         label_visibility="collapsed",
         key="query_events",
-        help=(
-            "TRAKE tìm một CHUỖI sự kiện theo thứ tự thời gian (khác KIS chỉ 1 khung). "
-            "Nhập mỗi event trên 1 dòng, từ sớm → muộn. Số dòng = số frame xuất ra CSV. "
-            "Viết tiếng Anh, ngắn gọn: 'a person opens the fridge'."
-        ),
+        help="TRAKE tìm chuỗi sự kiện theo thứ tự thời gian. Nhập mỗi hành động trên 1 dòng từ sớm đến muộn.",
     )
 
-# --- Ô Query + nút Chạy trong CÙNG một form (Enter = submit) ---
+# Form nhập Query & Nút Chạy
 with st.form("query_form", border=False):
     t_col, run_col = st.columns([3.8, 1], gap="small")
     with t_col:
-        st.markdown('<div class="mini-label">Query tìm kiếm</div>', unsafe_allow_html=True)
-        text = st.text_input("Query", placeholder="Dán đề BTC vào đây (Enter để chạy)",
+        st.markdown('<div class="mini-label">🔍 Nội dung truy vấn (Enter để tìm kiếm)</div>', unsafe_allow_html=True)
+        text = st.text_input("Query", placeholder="Nhập câu mô tả tiếng Việt hoặc tiếng Anh...",
                              label_visibility="collapsed", key="query_text")
     with run_col:
         st.markdown('<div class="mini-label">&nbsp;</div>', unsafe_allow_html=True)
-        submitted = st.form_submit_button("Chạy Agent", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("🚀 Chạy Tìm Kiếm", type="primary", **_FULL_WIDTH)
         if submitted:
             st.session_state["_run_agent"] = True
 
-# Nút tùy chọn: dịch VI→EN trước khi retrieval. Mặc định TẮT (dùng query nguyên bản).
-# Bật khi query nhập bằng tiếng Việt và muốn đảm bảo đầu vào CLIP (tiếng Anh).
-translate_query = st.checkbox(
-    "🌐 Dịch VI→EN",
-    value=st.session_state.get("cfg_translate", False),
-    key="cfg_translate",
-    help=(
-        "Dịch truy vấn tiếng Việt sang tiếng Anh trước khi retrieval (CLIP text "
-        "encoder là tiếng Anh nên đầu vào tiếng Anh cho kết quả tốt hơn). "
-        "Mặc định TẮT — dùng query nguyên bản. Bật nếu bạn nhập tiếng Việt và "
-        "muốn hệ thống tự dịch. Khi tắt mà vẫn nhập tiếng Việt, retrieval có thể "
-        "ra frame sai do CLIP không hiểu tiếng Việt."
-    ),
-)
+# Gợi ý đề mẫu 1-Click (Presets) & Tùy chọn Dịch
+chip_col1, chip_col2, chip_col3, chip_col4, tr_col = st.columns([1, 1, 1.2, 1, 1], gap="small")
+with chip_col1:
+    if st.button("🚗 Xe tự hành (QA)", key="chip_qa_car", **_FULL_WIDTH):
+        st.session_state["query_type"] = "qa"
+        st.session_state["search_mode"] = "siglip"
+        st.session_state["query_text"] = "The clip was filmed from inside a self-driving car; the steering wheel can be clearly seen turning to the right. The camera angle then shifts to the outside, capturing the white car turning left, with a red sign bearing six Chinese characters visible in the upper part of the frame."
+        st.session_state["query_question"] = "What number is displayed on the side of the white car?"
+        st.session_state["_run_agent"] = True
+        st.rerun()
+with chip_col2:
+    if st.button("🍳 Đầu bếp (KIS)", key="chip_kis_cook", **_FULL_WIDTH):
+        st.session_state["query_type"] = "kis"
+        st.session_state["search_mode"] = "hybrid"
+        st.session_state["query_text"] = "Một đầu bếp chế biến món ăn trong chảo, với các miếng dồi trường màu trắng và rau xanh. Đầu bếp cho bông hẹ vào chảo."
+        st.session_state["cfg_translate"] = True
+        st.session_state["_run_agent"] = True
+        st.rerun()
+with chip_col3:
+    if st.button("🚶‍♂️ Lấy nước (TRAKE)", key="chip_trake_fridge", **_FULL_WIDTH):
+        st.session_state["query_type"] = "trake"
+        st.session_state["search_mode"] = "siglip"
+        st.session_state["query_events"] = "A person opens the refrigerator\nThe person takes out a bottle of water\nThe person drinks water from the bottle"
+        st.session_state["_run_agent"] = True
+        st.rerun()
+with chip_col4:
+    if st.button("🗣️ Lời thoại ASR", key="chip_asr_news", **_FULL_WIDTH):
+        st.session_state["query_type"] = "kis"
+        st.session_state["search_mode"] = "asr"
+        st.session_state["query_text"] = "bản tin thời sự thông báo sạt lở bờ sông"
+        st.session_state["_run_agent"] = True
+        st.rerun()
+with tr_col:
+    translate_query = st.checkbox(
+        "🌐 Dịch VI→EN",
+        value=st.session_state.get("cfg_translate", False),
+        key="cfg_translate",
+        help="Dịch truy vấn tiếng Việt sang tiếng Anh trước khi đưa vào SigLIP. Bật khi nhập tiếng Việt.",
+    )
 
 if st.session_state.get("_run_agent"):
     st.session_state["_run_agent"] = False
-    if not text.strip():
-        st.warning("Hãy nhập query trước khi chạy Agent.")
+    if not text.strip() and not (query_type == "trake" and events_text.strip()):
+        st.warning("Hãy nhập nội dung truy vấn trước khi chạy.")
     else:
         try:
             query = build_query(query_type, text, question, events_text)
@@ -1205,15 +1216,7 @@ if st.session_state.get("_run_agent"):
                     "translate_query": bool(st.session_state.get("cfg_translate", False)),
                     "search_mode": str(st.session_state.get("search_mode", "hybrid") or "hybrid"),
                     "coarse_top_k": int(st.session_state.get("cfg_coarse_top_k", 200)),
-                    "vlm_judge_enabled": bool(st.session_state.get("cfg_vlm_judge", False)),
-                    "vlm_judge_model": str(st.session_state.get("cfg_vlm_judge_model", "Qwen/Qwen2.5-VL-7B-Instruct")),
-                    "vlm_judge_backend": str(st.session_state.get("cfg_vlm_judge_backend", "qwen")),
-                    "vlm_judge_top_k": int(st.session_state.get("cfg_vlm_judge_top_k", 15)),
-                    "vlm_backend": st.session_state.get("cfg_vlm_backend", "florence"),
-                    "vlm_model": st.session_state.get("cfg_vlm_model", "microsoft/Florence-2-base-ft"),
-                    "vlm_top_videos": int(st.session_state.get("cfg_vlm_top_videos", 20)),
-                    "vlm_max_workers": int(st.session_state.get("cfg_vlm_max_workers", 8)),
-                    "vlm_timeout": int(st.session_state.get("cfg_vlm_timeout", 120)),
+                    "vlm_backend": "none",
                 }
                 backend_url = st.session_state.get("cfg_backend", "http://127.0.0.1:8000")
 
@@ -1227,16 +1230,14 @@ if st.session_state.get("_run_agent"):
                     query=query,
                     candidates=result.candidates,
                     trace=result.trace,
-                    raw_root=st.session_state.get("cfg_root", "data/processed"),
+                    raw_root=st.session_state.get("cfg_root", DEFAULT_ROOT),
                     manifest_path=runtime["manifest_path"],
                     selected=[],
                     _query_nonce=st.session_state.get("_query_nonce", 0) + 1,
                 )
 
-                # Bản dịch (giữ nguyên cho mọi luồng)
                 translated = None
                 translation_source = None
-                gqe_facets = None
                 for step in result.trace:
                     if step.step == "translate":
                         try:
@@ -1247,148 +1248,46 @@ if st.session_state.get("_run_agent"):
                             translated = _text_change.get("to") or _td.get("to")
                         except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
                             translated = None
-                    elif step.step == "gqe_facets":
-                        try:
-                            gqe_facets = json.loads(step.detail)
-                        except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
-                            gqe_facets = None
                 st.session_state["translated_query"] = translated
-                st.session_state["gqe_facets"] = gqe_facets
-                if translation_source == "offline_fallback":
-                    st.toast(
-                        f"⚠️ LLM dịch lỗi — đang dùng bản dịch offline: {translated or text}",
-                        icon="🌐",
-                    )
-                elif translated:
+                if translated:
                     st.toast(f"✅ Đã dịch VI→EN: {translated}", icon="🌐")
                 elif text.strip() and _is_english(text):
                     st.toast("ℹ️ Query đã là tiếng Anh — không cần dịch", icon="🌐")
-                elif not bool(st.session_state.get("cfg_translate", False)):
-                    st.toast("ℹ️ Chưa bật 'Dịch VI→EN' — dùng query nguyên bản", icon="🌐")
-                else:
-                    st.toast("⚠️ Không dịch được (LLM lỗi?) — dùng nguyên bản tiếng Việt", icon="🌐")
-                    del st.session_state[k]
         except (BackendRequestError, ValidationError) as error:
             st.error(f"Không chạy được agent: {error}")
 
-with st.expander("Cấu hình nâng cao"):
+with st.expander("⚙️ Cấu hình nâng cao & Đường dẫn dữ liệu"):
     st.text_input("Backend API", "http://127.0.0.1:8000", key="cfg_backend")
-    st.text_input("Manifest", DEFAULT_MANIFEST, key="cfg_manifest")
+    st.text_input("Manifest JSONL", DEFAULT_MANIFEST, key="cfg_manifest")
     st.text_input("Feature .npy", DEFAULT_FEATURES, key="cfg_features")
     st.text_input("Dense ASR Feature .npy (BGE-M3)", DEFAULT_ASR_FEATURES, key="cfg_asr_features", help="Ma trận vector ngữ nghĩa lời thoại 1024-dim sinh bởi `aic2026 embed-asr`")
-    st.text_input("Root keyframe", DEFAULT_ROOT, key="cfg_root")
-    st.text_input("CLIP / SigLIP model", DEFAULT_CLIP_MODEL, key="cfg_clip_model", help="SigLIP 2: ViT-SO400M-14-SigLIP2-378 (siglip2), ViT-B-16-SigLIP2-384 (siglip2-base) | SigLIP 1: ViT-SO400M-14-SigLIP-384 (siglip) | CLIP: ViT-L-14")
-    st.text_input("CLIP pretrained", DEFAULT_CLIP_PRETRAINED, key="cfg_clip", help="openai, metaclip_fullcc, metaclip_400m, laion2b_s32b_b82k, webli")
-    st.text_input("Ollama model", "qwen3.5:4b", key="cfg_llm")
-    st.text_input("Ollama URL", "http://127.0.0.1:11434", key="cfg_ollama")
-    st.text_input(
-        "Metadata / Object filter (phân cách dấu phẩy)",
-        "",
-        key="cfg_filter",
-        help=(
-            "Lọc video theo nhãn Object và Metadata (object_labels, title, description "
-            "trong manifest). Ví dụ: 'trong cửa hàng,máy tính' sẽ chỉ giữ các video có "
-            "chứa những nhãn này trước khi chạy retrieval/TRAKE. Để trống = không lọc."
-        ),
-    )
-    st.number_input(
-        "TRAKE: số video lọc nhanh (coarse_top_k)",
-        min_value=0,
-        max_value=5000,
-        value=200,
-        step=50,
-        key="cfg_coarse_top_k",
-        help=(
-            "Giới hạn số video đưa vào DP alignment cho luồng TRAKE. "
-            "Lọc nhanh (coarse) theo độ tương đồng video-level trước, chỉ top-K "
-            "video liên quan nhất mới xếp hạng chi tiết. Nhỏ = nhanh (dataset lớn), "
-            "lớn = đầy đủ nhưng chậm/OOM. 0 = xét hết mọi video."
-        ),
-    )
-    # Cấu hình VLM-as-a-Judge (Qwen2.5-VL) thẩm định KIS, QA & TRAKE
-    st.markdown("---")
-    st.checkbox("⚖️ Kích hoạt VLM-as-a-Judge (Qwen2.5-VL)", value=False, key="cfg_vlm_judge",
-                help="Thẩm định chi tiết Top 15 ứng viên: phân tích chi tiết vật thể/màu sắc KIS, bằng chứng thị giác QA, và chuỗi sự kiện thời gian TRAKE.")
-    st.text_input("VLM Judge Model", "Qwen/Qwen2.5-VL-3B-Instruct", key="cfg_vlm_judge_model", help="Qwen/Qwen2.5-VL-3B-Instruct (Khuyên dùng cho 12GB VRAM - cực nhanh và nhẹ), Qwen/Qwen2.5-VL-7B-Instruct, hoặc Ollama model (qwen2.5vl:7b)")
-    st.selectbox("VLM Judge Backend", ["qwen", "ollama", "mock"], index=0, key="cfg_vlm_judge_backend")
-    st.number_input("VLM Judge: Số ứng viên thẩm định (Top-K)", min_value=1, max_value=50, value=15, key="cfg_vlm_judge_top_k")
+    st.text_input("Root Keyframes", DEFAULT_ROOT, key="cfg_root")
+    st.text_input("Root Videos (.mp4)", DEFAULT_VIDEOS_ROOT, key="cfg_videos_root")
+    st.text_input("Thư mục map-keyframes (.csv)", DEFAULT_MAP_KEYFRAMES, key="cfg_map_keyframes")
+    st.text_input("CLIP / SigLIP model", DEFAULT_CLIP_MODEL, key="cfg_clip_model")
 
-    # Cấu hình VLM phục vụ Phase-2 QA
-    st.markdown("---")
-    st.selectbox("QA VLM Backend (Auto-answer)", ["none", "florence"], index=0, key="cfg_vlm_backend",
-                 help="Florence-2 tự sinh câu trả lời text cho QA (tùy chọn).")
-    st.text_input("QA VLM Model", "microsoft/Florence-2-base-ft", key="cfg_vlm_model")
-    st.number_input("QA VLM: Số video giới hạn gửi (vlm_top_videos)", min_value=1, max_value=200, value=20, key="cfg_vlm_top_videos")
-    st.number_input("QA VLM: Số thread song song (vlm_max_workers)", min_value=1, max_value=32, value=8, key="cfg_vlm_max_workers")
-    st.number_input("QA VLM: Timeout mỗi video (giây)", min_value=10, max_value=600, value=120, key="cfg_vlm_timeout")
-    st.text_input("Root Videos (.mp4)", DEFAULT_VIDEOS_ROOT, key="cfg_videos_root", help="Thư mục chứa các file video gốc .mp4 để phát video trực tiếp.")
-    st.text_input("Thư mục map-keyframes (.csv)", DEFAULT_MAP_KEYFRAMES, key="cfg_map_keyframes", help="Thư mục chứa các file CSV ánh xạ frame_idx sang pts_time.")
-
-st.markdown("</div>", unsafe_allow_html=True)  # đóng .topbar
-
-# Hiển thị bản dịch tiếng Anh (nếu có) ngay dưới hàng nhập để dễ thấy bước trans
-_translated = st.session_state.get("translated_query")
-_query_text_raw = st.session_state.get("query_text", "")
-if _translated:
-    st.markdown(
-        f'<div style="margin:.1rem 0 .5rem;">'
-        f'<span class="peg-pill">🌐 Đã dịch (VI→EN)</span> '
-        f'<span class="small-muted">{html.escape(_translated)}</span></div>',
-        unsafe_allow_html=True,
-    )
-elif _query_text_raw and _is_english(_query_text_raw):
-    # Đã chạy, query gốc thực sự là tiếng Anh (không có dấu tiếng Việt)
-    st.markdown(
-        f'<div style="margin:.1rem 0 .5rem;">'
-        f'<span class="peg-pill">🌐 Đã kiểm tra dịch</span> '
-        f'<span class="small-muted">Query đã là tiếng Anh — không cần dịch.</span></div>',
-        unsafe_allow_html=True,
-    )
-
-# Hiển thị bóc tách 4 Tầng Thị Giác (GQE & SRRF Fusion)
-_gqe = st.session_state.get("gqe_facets")
-if _gqe and isinstance(_gqe, dict) and any(_gqe.values()):
-    with st.expander("🔍 Bóc tách 4 Tầng Thị Giác (GQE & SRRF Fusion)", expanded=False):
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(f"**🎯 q_core (Toàn cảnh):** `{_gqe.get('q_core', '')}`")
-            st.markdown(f"**👤 q_entity (Chủ thể/Thuộc tính):** `{_gqe.get('q_entity', '')}`")
-        with c2:
-            st.markdown(f"**⚡ q_action (Hành động/Cử chỉ):** `{_gqe.get('q_action', '')}`")
-            st.markdown(f"**🏞️ q_scene (Bối cảnh/Góc máy):** `{_gqe.get('q_scene', '')}`")
-
-st.markdown("<hr style='margin:.3rem 0 1rem;'>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ===========================================================================
-# PHẦN DƯỚI: GALLERY ẢNH (TRUNG TÂM) + CHỌN + XUẤT JSON
+# GALLERY TRUNG TÂM
 # ===========================================================================
 if "candidates" not in st.session_state:
-    st.info("Nhập query ở hàng trên rồi bấm **Chạy Agent**. Kết quả (tới 100 keyframe) hiện nguyên màn hình bên dưới để bạn xem và chọn.")
+    st.info("💡 Nhập nội dung truy vấn ở trên hoặc bấm vào các nút **Đề mẫu 1-Click** để bắt đầu tìm kiếm.")
 else:
     query: Query = st.session_state["query"]
     candidates: list[Candidate] = st.session_state["candidates"]
-    root = Path(st.session_state.get("raw_root", "data/processed"))
-    # Đảm bảo session selected là list có thứ tự hợp lệ (không phải set cũ)
+    root = Path(st.session_state.get("raw_root", DEFAULT_ROOT))
     if "selected" not in st.session_state or not isinstance(st.session_state["selected"], list):
         st.session_state["selected"] = []
     selected: list[int] = st.session_state["selected"]
 
     if not candidates:
-        st.warning("Agent không trả candidate. Hãy kiểm tra index hoặc đổi query.")
+        st.warning("Không tìm thấy candidate phù hợp. Hãy thử đổi query hoặc chế độ tìm kiếm.")
     else:
         total = len(candidates)
-        # candidates đã sort score giảm dần từ agent (hoặc sort lại cho chắc)
         candidates.sort(key=lambda c: c.score, reverse=True)
 
-        st.markdown(
-            f'<span class="peg-pill">Đã trả {total} candidate</span> '
-            f'<span class="small-muted">— tick ảnh để chọn, xuất JSON chuẩn BTC. '
-            f'Score cao nhất đứng đầu.</span>',
-            unsafe_allow_html=True,
-        )
-
-        # Thanh công cụ: lọc video + xem video top 1 + giới hạn + chọn tất cả
         col_filter, col_vid_quick, col_limit, col_all = st.columns([2, 1.2, 1, 1])
         with col_filter:
             if query.type == "TRAKE":
@@ -1399,23 +1298,16 @@ else:
                 video_options = sorted({c.video_id for c in candidates})
                 opts = "".join([f'<option value="{html.escape(vid)}">{html.escape(vid)}</option>' for vid in video_options])
                 filter_html = f"""
-                <div style="margin-bottom: 0px;">
-                    <label for="client-video-filter" style="font-weight: bold; color: var(--peg-ink); font-size: 0.85rem; display: block; margin-bottom: 4px;">Lọc theo video (Tức thì)</label>
+                <div>
+                    <label style="font-weight: 800; color: #1e1b4b; font-size: 0.8rem; display: block; margin-bottom: 3px;">🎬 Lọc nhanh video</label>
                     <select id="client-video-filter" onchange="window.filterKeyframes(this.value)" style="
-                        width: 100%;
-                        padding: 6px 10px;
-                        border-radius: 0.5rem;
-                        border: 1.5px solid #c9b6e8;
-                        background: rgba(255,255,255,0.85);
-                        color: var(--peg-ink);
-                        font-size: 0.85rem;
-                        height: 38px;
+                        width: 100%; padding: 5px 8px; border-radius: 6px; border: 1.5px solid #cbd5e1;
+                        background: #fff; color: #1e1b4b; font-size: 0.85rem; height: 36px; font-weight: 600;
                     ">
-                        <option value="Tất cả">Tất cả</option>
+                        <option value="Tất cả">Tất cả ({len(video_options)} videos)</option>
                         {opts}
                     </select>
                 </div>
-                
                 <script>
                 window.filterKeyframes = function(selectedVideo) {{
                     const containers = document.querySelectorAll('.gallery-card-container');
@@ -1429,19 +1321,10 @@ else:
                         }}
                     }});
                 }};
-                // Gọi lại bộ lọc khi Streamlit rerun để đồng bộ trạng thái hiển thị
-                setTimeout(() => {{
-                    const dropdown = document.getElementById('client-video-filter');
-                    if (dropdown) {{
-                        window.filterKeyframes(dropdown.value);
-                    }}
-                }}, 100);
-
-                // Phím tắt bàn phím: Nhấn V hoặc K để mở Video & Keyframe Inspector
                 document.addEventListener('keydown', function(e) {{
                     if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
                     if (e.key === 'v' || e.key === 'V' || e.key === 'k' || e.key === 'K') {{
-                        const btn = document.querySelector('button[id*="btn_quick_vid_top1"]') || document.querySelector('button[id*="btn_v_"]');
+                        const btn = document.querySelector('button[id*="btn_quick_vid_top1"]');
                         if (btn) btn.click();
                     }}
                 }});
@@ -1449,8 +1332,8 @@ else:
                 """
                 st.markdown(filter_html, unsafe_allow_html=True)
         with col_vid_quick:
-            st.markdown('<label style="font-weight: bold; color: var(--peg-ink); font-size: 0.85rem; display: block; margin-bottom: 4px;">🎬 Video Top 1 (Phím: V/K)</label>', unsafe_allow_html=True)
-            if candidates and st.button("🎬 Xem Video #1", key="btn_quick_vid_top1", use_container_width=True, help="Mở video & duyệt keyframes của Candidate #1 (Phím tắt: V hoặc K)"):
+            st.markdown('<label style="font-weight: 800; color: #1e1b4b; font-size: 0.8rem; display: block; margin-bottom: 3px;">⚡ Xem Video Top #1 (Phím: V/K)</label>', unsafe_allow_html=True)
+            if candidates and st.button("🎬 Mở Video #1", key="btn_quick_vid_top1", **_FULL_WIDTH, help="Mở video & duyệt keyframes của Candidate #1"):
                 top_cand = candidates[0]
                 show_video_dialog(
                     video_id=top_cand.video_id,
@@ -1461,74 +1344,45 @@ else:
                     map_dir=st.session_state.get("cfg_map_keyframes", DEFAULT_MAP_KEYFRAMES),
                 )
         with col_limit:
-            if total <= 1:
-                max_show = total
-            else:
-                max_show = st.number_input(
-                    "Số ảnh hiển thị",
-                    min_value=1,
-                    max_value=total,
-                    value=min(20, total),
-                    step=1,
-                    key="max_show_input",
-                )
+            max_show = st.number_input("Số ảnh hiển thị", min_value=1, max_value=total, value=min(20, total), step=5, key="max_show_input")
         with col_all:
-            if st.button("Chọn tất cả hiển thị", use_container_width=True):
-                # Giữ NGUYÊN thứ tự những gì user đã chọn trước đó (đầu danh sách).
-                # Chỉ nối thêm các frame đang hiển thị mà CHƯA được chọn, theo
-                # thứ tự hiển thị (score giảm dần). Không xáo trộn, không đẩy
-                # các lựa chọn cũ xuống dưới.
-                vis_idx = [
-                    i for i, c in enumerate(candidates)
-                    if (selected_video == "Tất cả" or c.video_id == selected_video)
-                ][:max_show]
+            st.markdown('<label style="font-weight: 800; color: #1e1b4b; font-size: 0.8rem; display: block; margin-bottom: 3px;">&nbsp;</label>', unsafe_allow_html=True)
+            if st.button("Chọn tất cả", **_FULL_WIDTH):
+                vis_idx = [i for i, c in enumerate(candidates) if (selected_video == "Tất cả" or c.video_id == selected_video)][:max_show]
                 for i in vis_idx:
                     if i not in selected:
                         selected.append(i)
                 st.rerun()
 
-        # Hiển thị: ĐƯA CÁC FRAME ĐÃ CHỌN LÊN ĐẦU (theo thứ tự chọn), phần còn lại
-        # giữ nguyên thứ tự score bên dưới. Nhờ đó khi user tick vài frame, chúng
-        # nhảy lên trên cùng ngay, dễ thấy; và danh sách xuất ra cũng bắt đầu bằng
-        # những frame đã chọn (frame chọn đầu = trên cùng = top 1).
-        filtered = [
-            (i, c) for i, c in enumerate(candidates)
-            if (selected_video == "Tất cả" or c.video_id == selected_video)
-        ]
+        filtered = [(i, c) for i, c in enumerate(candidates) if (selected_video == "Tất cả" or c.video_id == selected_video)]
         sel_set = set(selected)
         chosen = [(i, c) for (i, c) in filtered if i in sel_set]
         rest = [(i, c) for (i, c) in filtered if i not in sel_set]
-        # Sắp xếp lại chosen theo thứ tự trong `selected` (đầu tiên = trên cùng)
         order = {idx: pos for pos, idx in enumerate(selected)}
         chosen.sort(key=lambda ic: order.get(ic[0], len(selected)))
         visible = (chosen + rest)[:max_show]
 
-        # ---- Gallery ảnh ----
         if query.type.lower() == "trake":
             _render_trake_gallery(query, visible, root, selected)
         else:
             _render_frame_gallery(query, visible, root, selected)
 
-        # ---- Thanh xuất CSV chuẩn nộp bài BTC ----
+        # Thanh xuất CSV chuẩn nộp bài BTC
         st.divider()
         n_sel = len(selected)
-        st.markdown(f"**Đã chọn {n_sel} ảnh** (xuất theo thứ tự chọn — frame click trước ở đầu).")
+        st.markdown(f"**📌 Đã chọn {n_sel} ảnh** *(thứ tự xuất bài = thứ tự bạn đã click chọn)*")
         if n_sel > 0:
             btc_csv = build_btc_csv(query, candidates, selected)
             col_dl, col_cl = st.columns([1, 2])
             with col_dl:
                 st.download_button(
-                    "📥 Tải CSV chuẩn BTC",
+                    "📥 Tải CSV Chuẩn Nộp Bài",
                     btc_csv,
                     file_name=f"query-{query.query_id}-{query.type}.csv",
                     mime="text/csv",
-                    use_container_width=True,
+                    **_FULL_WIDTH,
                 )
             with col_cl:
                 st.code(btc_csv, language="text")
         else:
-            st.caption("Chưa chọn ảnh nào. Tick vào ảnh ở gallery để xuất.")
-
-        with st.expander("Trace agent (plan / retrieve / judge)"):
-            st.json([item.model_dump() for item in st.session_state["trace"]])
-
+            st.caption("Chưa chọn ảnh nào. Hãy tick chọn các ảnh kết quả đúng để xuất file nộp bài.")
