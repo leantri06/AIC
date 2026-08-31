@@ -1211,6 +1211,20 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
 
 
 # ---------------------------------------------------------------------------
+# Callback Function for Preset Chips (Executes BEFORE widgets instantiate)
+# ---------------------------------------------------------------------------
+def apply_preset_query(q_type: str, s_mode: str, q_text: str, q_question: str = "", q_events: str = "", translate: bool = False, model: str = "siglip2"):
+    st.session_state["query_type"] = q_type
+    st.session_state["search_mode"] = s_mode
+    st.session_state["query_text"] = q_text
+    st.session_state["query_question"] = q_question
+    st.session_state["query_events"] = q_events
+    st.session_state["cfg_translate"] = translate
+    st.session_state["selected_model_choice"] = model
+    st.session_state["_run_agent"] = True
+
+
+# ---------------------------------------------------------------------------
 # HEADER
 # ---------------------------------------------------------------------------
 st.markdown(
@@ -1321,41 +1335,63 @@ with st.form("query_form", border=False):
         if submitted:
             st.session_state["_run_agent"] = True
 
-# Gợi ý đề mẫu 1-Click (Presets) & Tùy chọn Dịch
+# Gợi ý đề mẫu 1-Click (Sử dụng on_click callback an toàn) & Tùy chọn Dịch
 chip_col1, chip_col2, chip_col3, chip_col4, tr_col = st.columns([1, 1, 1.2, 1, 1], gap="small")
 with chip_col1:
-    if st.button("🚗 Xe tự hành (QA)", key="chip_qa_car", **_FULL_WIDTH):
-        st.session_state["query_type"] = "qa"
-        st.session_state["search_mode"] = "siglip"
-        st.session_state["selected_model_choice"] = "siglip2"
-        st.session_state["query_text"] = "The clip was filmed from inside a self-driving car; the steering wheel can be clearly seen turning to the right. The camera angle then shifts to the outside, capturing the white car turning left, with a red sign bearing six Chinese characters visible in the upper part of the frame."
-        st.session_state["query_question"] = "What number is displayed on the side of the white car?"
-        st.session_state["_run_agent"] = True
-        st.rerun()
+    st.button(
+        "🚗 Xe tự hành (QA)",
+        key="chip_qa_car",
+        on_click=apply_preset_query,
+        kwargs={
+            "q_type": "qa",
+            "s_mode": "siglip",
+            "q_text": "The clip was filmed from inside a self-driving car; the steering wheel can be clearly seen turning to the right. The camera angle then shifts to the outside, capturing the white car turning left, with a red sign bearing six Chinese characters visible in the upper part of the frame.",
+            "q_question": "What number is displayed on the side of the white car?",
+            "model": "siglip2",
+        },
+        **_FULL_WIDTH,
+    )
 with chip_col2:
-    if st.button("🍳 Đầu bếp (KIS)", key="chip_kis_cook", **_FULL_WIDTH):
-        st.session_state["query_type"] = "kis"
-        st.session_state["search_mode"] = "hybrid"
-        st.session_state["selected_model_choice"] = "siglip2"
-        st.session_state["query_text"] = "Một đầu bếp chế biến món ăn trong chảo, với các miếng dồi trường màu trắng và rau xanh. Đầu bếp cho bông hẹ vào chảo."
-        st.session_state["cfg_translate"] = True
-        st.session_state["_run_agent"] = True
-        st.rerun()
+    st.button(
+        "🍳 Đầu bếp (KIS)",
+        key="chip_kis_cook",
+        on_click=apply_preset_query,
+        kwargs={
+            "q_type": "kis",
+            "s_mode": "hybrid",
+            "q_text": "Một đầu bếp chế biến món ăn trong chảo, với các miếng dồi trường màu trắng và rau xanh. Đầu bếp cho bông hẹ vào chảo.",
+            "translate": True,
+            "model": "siglip2",
+        },
+        **_FULL_WIDTH,
+    )
 with chip_col3:
-    if st.button("🚶‍♂️ Lấy nước (TRAKE)", key="chip_trake_fridge", **_FULL_WIDTH):
-        st.session_state["query_type"] = "trake"
-        st.session_state["search_mode"] = "siglip"
-        st.session_state["selected_model_choice"] = "siglip2"
-        st.session_state["query_events"] = "A person opens the refrigerator\nThe person takes out a bottle of water\nThe person drinks water from the bottle"
-        st.session_state["_run_agent"] = True
-        st.rerun()
+    st.button(
+        "🚶‍♂️ Lấy nước (TRAKE)",
+        key="chip_trake_fridge",
+        on_click=apply_preset_query,
+        kwargs={
+            "q_type": "trake",
+            "s_mode": "siglip",
+            "q_text": "",
+            "q_events": "A person opens the refrigerator\nThe person takes out a bottle of water\nThe person drinks water from the bottle",
+            "model": "siglip2",
+        },
+        **_FULL_WIDTH,
+    )
 with chip_col4:
-    if st.button("🗣️ Lời thoại ASR", key="chip_asr_news", **_FULL_WIDTH):
-        st.session_state["query_type"] = "kis"
-        st.session_state["search_mode"] = "asr"
-        st.session_state["query_text"] = "bản tin thời sự thông báo sạt lở bờ sông"
-        st.session_state["_run_agent"] = True
-        st.rerun()
+    st.button(
+        "🗣️ Lời thoại ASR",
+        key="chip_asr_news",
+        on_click=apply_preset_query,
+        kwargs={
+            "q_type": "kis",
+            "s_mode": "asr",
+            "q_text": "bản tin thời sự thông báo sạt lở bờ sông",
+            "model": "siglip2",
+        },
+        **_FULL_WIDTH,
+    )
 with tr_col:
     translate_query = st.checkbox(
         "🌐 Dịch VI→EN",
