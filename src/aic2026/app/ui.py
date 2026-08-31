@@ -50,40 +50,47 @@ def _detect_default_path(candidates: list[str]) -> str:
 
 
 DEFAULT_MANIFEST = _detect_default_path([
+    r"D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl",
+    r"D:\bachkhoa\ai_challenge\data\processed\siglip2_manifest.jsonl",
     r"D:\ai_challenge\data\processed\siglip2_manifest.jsonl",
-    "data/processed/siglip2_manifest.jsonl",
     r"D:\ai_challenge\data\processed\siglip_manifest.jsonl",
     "data/processed/siglip_manifest.jsonl",
-    r"D:\ai_challenge\data\processed\derived_manifest.jsonl",
+    "data/processed/siglip2_manifest.jsonl",
     "data/processed/derived_manifest.jsonl",
     "data/processed/official_manifest.jsonl",
 ])
 DEFAULT_FEATURES = _detect_default_path([
+    r"D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy",
+    r"D:\bachkhoa\ai_challenge\data\processed\siglip2_features.npy",
     r"D:\ai_challenge\data\processed\siglip2_features.npy",
-    "data/processed/siglip2_features.npy",
     r"D:\ai_challenge\data\processed\siglip_features.npy",
     "data/processed/siglip_features.npy",
-    r"D:\ai_challenge\data\processed\derived_features.npy",
+    "data/processed/siglip2_features.npy",
     "data/processed/derived_features.npy",
     "data/processed/official_features.npy",
 ])
 DEFAULT_ROOT = _detect_default_path([
+    r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes",
+    r"D:\bachkhoa\ai_challenge\data\extracted",
     r"D:\ai_challenge\data\extracted\Keyframes",
     r"D:\ai_challenge\data\extracted",
     "data/raw/Keyframes",
     "data/processed",
 ])
 DEFAULT_VIDEOS_ROOT = _detect_default_path([
+    r"D:\bachkhoa\ai_challenge\data\extracted\Videos",
     r"D:\ai_challenge\data\extracted\Videos",
     "data/extracted/Videos",
     "data/raw/Videos",
 ])
 DEFAULT_MAP_KEYFRAMES = _detect_default_path([
+    r"D:\bachkhoa\ai_challenge\data\extracted\map-keyframes",
     r"D:\ai_challenge\data\extracted\map-keyframes",
     "data/extracted/map-keyframes",
     "data/raw/map-keyframes",
 ])
 DEFAULT_ASR_FEATURES = _detect_default_path([
+    r"D:\bachkhoa\ai_challenge\data\processed\asr_dense_features.npy",
     r"D:\ai_challenge\data\processed\asr_dense_features.npy",
     "data/processed/asr_dense_features.npy",
 ])
