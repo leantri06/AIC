@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import os
 
-# Fix OpenMP duplicate lib runtime conflict on Windows (Error #15 / 0xC0000005)
-os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+# Fix OpenMP duplicate lib runtime conflict & thread pool crashes on Windows (0xC0000005)
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 if os.path.exists(r"D:\bachkhoa\ai_challenge\data"):
     os.environ.setdefault("HF_HOME", r"D:\bachkhoa\ai_challenge\data\.cache\huggingface")
@@ -169,9 +174,17 @@ DEFAULT_CLIP_PRETRAINED = _INIT_PATHS["clip_pretrained"]
 
 st.set_page_config(page_title="PEGASUS AI Challenge 2026", layout="wide", page_icon="🦄")
 
-# Session state theme (Default to dark "midnight" - gentle on eyes)
+# Khởi tạo an toàn toàn bộ session state trước khi widget khởi tạo
+if "query_type" not in st.session_state:
+    st.session_state["query_type"] = "kis"
+if "search_mode" not in st.session_state:
+    st.session_state["search_mode"] = "hybrid"
+if "selected_model_choice" not in st.session_state:
+    st.session_state["selected_model_choice"] = "siglip2"
 if "app_theme" not in st.session_state:
     st.session_state["app_theme"] = "midnight"
+if "theme_selector" not in st.session_state:
+    st.session_state["theme_selector"] = "midnight"
 
 current_theme = st.session_state["app_theme"]
 
@@ -458,9 +471,6 @@ def run_backend(task_type: str, query: Query, runtime: dict, backend_url: str):
             raise BackendRequestError(f"Lỗi khi chạy Agent trực tiếp: {local_exc}") from local_exc
     except (json.JSONDecodeError, ValidationError) as exc:
         raise BackendRequestError("Backend không trả về dữ liệu hợp lệ.") from exc
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -1047,24 +1057,10 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                     f'title="{html.escape(", ".join(ocr_labels))}">🔤 {html.escape(short_ocr)}</div>'
                 )
 
-            judge_score = item.metadata.get("vlm_judge_score") if item.metadata else None
-            judge_reason = item.metadata.get("vlm_judge_reason") if item.metadata else None
-            judge_html = ""
-            if judge_score is not None:
-                badge_bg = "rgba(16, 185, 129, 0.2)" if float(judge_score) >= 70 else "rgba(245, 158, 11, 0.2)"
-                badge_color = "#34d399" if float(judge_score) >= 70 else "#fbbf24"
-                judge_label = "🎯 Bằng chứng QA" if query.type == "qa" else "⚖️ VLM Judge"
-                judge_html = (
-                    f'<div style="font-size:0.72rem; font-weight:700; color:{badge_color}; background:{badge_bg}; '
-                    f'border-radius:4px; padding:2px 5px; margin-top:2px; line-height:1.2;" '
-                    f'title="{html.escape(str(judge_reason or ""))}">{judge_label}: {float(judge_score):.0f}/100</div>'
-                )
-
             st.markdown(
                 f'<div class="card-meta">'
                 f'<span class="card-rank">#{idx + 1}</span> &nbsp;'
                 f'<span class="card-video">{html.escape(item.video_id)}</span> · <b>{item.frame_id}</b>'
-                f"{judge_html}"
                 f"{ocr_html}"
                 f"{asr_html}</div>",
                 unsafe_allow_html=True,
@@ -1215,7 +1211,6 @@ with top_c1:
     query_type = st.segmented_control(
         "Luồng",
         ["kis", "qa", "trake"],
-        default="kis",
         key="query_type",
         label_visibility="collapsed",
     )
@@ -1230,7 +1225,6 @@ with top_c2:
             "asr": "🗣️ Lời thoại",
             "ocr": "🔤 OCR",
         }.get(x, x),
-        default="hybrid",
         key="search_mode",
         label_visibility="collapsed",
     )
@@ -1245,7 +1239,6 @@ with top_c3:
             "clip-l14": "🎨 OpenAI CLIP (Derived)",
             "siglip2-base": "⚡ SigLIP 2 Base (ViT-B-16)",
         }.get(x, x),
-        index=0,
         key="selected_model_choice",
         label_visibility="collapsed",
     )
@@ -1255,11 +1248,10 @@ with top_c4:
         "Theme",
         ["midnight", "light"],
         format_func=lambda x: "🌙 Tối Dịu" if x == "midnight" else "☁️ Sáng Dịu",
-        index=0 if current_theme == "midnight" else 1,
         key="theme_selector",
         label_visibility="collapsed",
     )
-    if theme_choice != current_theme:
+    if theme_choice != st.session_state.get("app_theme", "midnight"):
         st.session_state["app_theme"] = theme_choice
         st.rerun()
 
