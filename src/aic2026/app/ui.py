@@ -75,8 +75,6 @@ DEFAULT_MASTER_ROOT = _detect_default_path([
 def resolve_data_root_and_paths(base_str: str, model_choice: str = "siglip2") -> dict[str, str]:
     """
     Tự động suy luận toàn bộ các đường dẫn con từ 1 đường dẫn gốc duy nhất và lựa chọn mô hình.
-    Ví dụ: Người dùng chỉ cần nhập 'D:\bachkhoa\ai_challenge' hoặc 'D:\bachkhoa\ai_challenge\data',
-    hệ thống sẽ tự động tìm thấy manifest, features, keyframes, videos, map-keyframes tương ứng với mô hình.
     """
     cleaned = (base_str or "").strip(" '\"")
     base = Path(cleaned) if cleaned else Path("data")
@@ -115,18 +113,14 @@ def resolve_data_root_and_paths(base_str: str, model_choice: str = "siglip2") ->
     
     cfg = model_configs.get(model_choice, model_configs["siglip2"])
 
-    # 1. Manifest
     manifest_candidates = [data_dir / "processed" / name for name in cfg["manifest_names"]]
     manifest = next((c for c in manifest_candidates if c.exists()), manifest_candidates[0])
 
-    # 2. Features
     feature_candidates = [data_dir / "processed" / name for name in cfg["feature_names"]]
     features = next((c for c in feature_candidates if c.exists()), feature_candidates[0])
 
-    # 3. Dense ASR
     asr_dense = data_dir / "processed" / "asr_dense_features.npy"
 
-    # 4. Keyframes
     kf_candidates = [
         data_dir / "extracted" / "Keyframes",
         data_dir / "extracted",
@@ -134,7 +128,6 @@ def resolve_data_root_and_paths(base_str: str, model_choice: str = "siglip2") ->
     ]
     keyframes = next((c for c in kf_candidates if c.exists()), kf_candidates[0])
 
-    # 5. Videos
     vid_candidates = [
         data_dir / "extracted" / "Videos",
         data_dir / "Videos",
@@ -142,7 +135,6 @@ def resolve_data_root_and_paths(base_str: str, model_choice: str = "siglip2") ->
     ]
     videos = next((c for c in vid_candidates if c.exists()), vid_candidates[0])
 
-    # 6. Map Keyframes
     map_candidates = [
         data_dir / "extracted" / "map-keyframes",
         data_dir / "map-keyframes",
@@ -177,160 +169,235 @@ DEFAULT_CLIP_PRETRAINED = _INIT_PATHS["clip_pretrained"]
 
 st.set_page_config(page_title="PEGASUS AI Challenge 2026", layout="wide", page_icon="🦄")
 
-st.markdown(
+# Session state theme (Default to dark "midnight" - gentle on eyes)
+if "app_theme" not in st.session_state:
+    st.session_state["app_theme"] = "midnight"
+
+current_theme = st.session_state["app_theme"]
+
+# CSS Themes: Midnight Dark (Dịu mắt, hiện đại) vs Soft Light (Sáng dịu, không chói)
+if current_theme == "midnight":
+    CSS_VARIABLES = """
+    :root {
+      --bg-main: #0b0f17;
+      --bg-gradient: radial-gradient(1200px 700px at 15% -10%, rgba(59, 130, 246, 0.12), transparent 70%),
+                     radial-gradient(1000px 600px at 85% 0%, rgba(99, 102, 241, 0.12), transparent 70%),
+                     linear-gradient(180deg, #0b0f17 0%, #0f172a 100%);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --card-bg: rgba(21, 28, 44, 0.75);
+      --card-border: rgba(51, 65, 85, 0.6);
+      --card-hover-border: #6366f1;
+      --card-selected-border: #38bdf8;
+      --card-selected-bg: rgba(14, 116, 144, 0.2);
+      --topbar-bg: rgba(15, 23, 42, 0.82);
+      --topbar-border: rgba(51, 65, 85, 0.7);
+      --header-bg: linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #042f2e 100%);
+      --header-border: 1px solid rgba(99, 102, 241, 0.35);
+      --input-bg: rgba(15, 23, 42, 0.85);
+      --input-border: #334155;
+      --input-text: #f8fafc;
+      --meta-bg: rgba(11, 15, 23, 0.75);
+      --meta-border: rgba(51, 65, 85, 0.5);
+      --badge-score-high: rgba(16, 185, 129, 0.9);
+      --badge-score-mid: rgba(245, 158, 11, 0.9);
+      --badge-score-low: rgba(71, 85, 105, 0.85);
+      --btn-copy-bg: #1e293b;
+      --btn-copy-color: #cbd5e1;
+      --btn-copy-border: #475569;
+      --btn-copy-hover: #334155;
+    }
     """
+else:
+    # Soft Minimal Light (Dịu nhẹ, không chói lóa)
+    CSS_VARIABLES = """
+    :root {
+      --bg-main: #f1f5f9;
+      --bg-gradient: radial-gradient(1200px 700px at 15% -10%, rgba(224, 231, 255, 0.6), transparent 70%),
+                     radial-gradient(1000px 600px at 85% 0%, rgba(207, 250, 254, 0.6), transparent 70%),
+                     linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --card-bg: rgba(255, 255, 255, 0.88);
+      --card-border: rgba(203, 213, 225, 0.85);
+      --card-hover-border: #818cf8;
+      --card-selected-border: #0284c7;
+      --card-selected-bg: rgba(240, 249, 255, 0.95);
+      --topbar-bg: rgba(255, 255, 255, 0.82);
+      --topbar-border: rgba(203, 213, 225, 0.9);
+      --header-bg: linear-gradient(135deg, #312e81 0%, #1e293b 60%, #0f172a 100%);
+      --header-border: 1px solid rgba(255, 255, 255, 0.2);
+      --input-bg: #ffffff;
+      --input-border: #cbd5e1;
+      --input-text: #0f172a;
+      --meta-bg: rgba(248, 250, 252, 0.9);
+      --meta-border: rgba(226, 232, 240, 0.9);
+      --badge-score-high: rgba(16, 185, 129, 0.9);
+      --badge-score-mid: rgba(245, 158, 11, 0.9);
+      --badge-score-low: rgba(148, 163, 184, 0.9);
+      --btn-copy-bg: #f8fafc;
+      --btn-copy-color: #334155;
+      --btn-copy-border: #cbd5e1;
+      --btn-copy-hover: #e2e8f0;
+    }
+    """
+
+st.markdown(
+    f"""
 <style>
-:root{
-  --peg-violet:#8b5cf6; --peg-pink:#ec4899; --peg-cyan:#06b6d4; --peg-amber:#f59e0b;
-  --peg-emerald:#10b981; --peg-ink:#1e1b4b; --peg-muted:#64748b; --peg-card-bg:rgba(255,255,255,0.82);
-}
+{CSS_VARIABLES}
 
-/* Nền gradient hiện đại Glassmorphism + Glow mềm */
-html, body, [data-testid="stAppViewContainer"] { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-[data-testid="stAppViewContainer"] {
-  background:
-    radial-gradient(1000px 600px at 8% -5%, rgba(236,72,153,0.14), transparent 60%),
-    radial-gradient(900px 600px at 92% 0%, rgba(6,182,212,0.14), transparent 60%),
-    radial-gradient(800px 700px at 50% 115%, rgba(139,92,246,0.14), transparent 60%),
-    linear-gradient(165deg, #f8fafc 0%, #f5f3ff 40%, #f0fdfa 100%);
+/* Nền mượt mà dịu mắt */
+html, body, [data-testid="stAppViewContainer"] {{
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text-main);
+}}
+[data-testid="stAppViewContainer"] {{
+  background: var(--bg-gradient);
   background-attachment: fixed;
-}
+}}
 
-/* ---- Header (Gradient Pastel + Glass Glow) ---- */
-.peg-header {
-  position:relative; display:flex; align-items:center; justify-content:space-between;
-  background: linear-gradient(115deg, #7c3aed 0%, #db2777 50%, #0891b2 100%);
-  padding:.75rem 1.25rem; border-radius:1rem;
-  box-shadow: 0 10px 25px -5px rgba(124,58,237,0.35); margin-bottom:.85rem;
-}
-.peg-header-left { display:flex; align-items:center; gap:.85rem; }
-.peg-logo {
-  display:flex; align-items:center; justify-content:center;
-  width:48px; height:48px; flex:0 0 auto; background:rgba(255,255,255,0.22);
-  border-radius:.75rem; border:1px solid rgba(255,255,255,0.45);
-  box-shadow: inset 0 0 10px rgba(255,255,255,0.3); backdrop-filter:blur(8px);
-}
-.peg-horse { width:34px; height:34px; display:block; }
-.peg-titles { display:flex; flex-direction:column; line-height:1.1; }
-.peg-word { font-size:1.45rem; font-weight:900; color:#fff; letter-spacing:.12em; margin:0;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-.peg-sub { font-size:.72rem; color:rgba(255,255,255,0.92); font-weight:600; letter-spacing:.04em; margin-top:.15rem; }
-.peg-badge {
-  background:rgba(255,255,255,0.25); color:#fff; font-size:.7rem; font-weight:800;
-  padding:.35rem .75rem; border-radius:999px; border:1px solid rgba(255,255,255,0.5);
-  white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,0.1); backdrop-filter:blur(6px);
-}
+/* Typography fixes */
+h1, h2, h3, h4, h5, p, span, label {{
+  color: var(--text-main);
+}}
 
-/* ---- Topbar Search Panel (Glassmorphism Card) ---- */
-.topbar {
-  background: rgba(255,255,255,0.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-  border: 1px solid rgba(255,255,255,0.9); border-radius:1rem;
-  padding:.85rem 1rem; margin-bottom:.85rem; box-shadow:0 8px 24px -4px rgba(139,92,246,0.12);
-}
-.mini-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.08em;
-  color:#6366f1; margin-bottom:.25rem; font-weight:800; display:flex; align-items:center; gap:4px; }
+/* ---- Header (Sleek Matte Titanium Bar) ---- */
+.peg-header {{
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  background: var(--header-bg);
+  padding: .65rem 1.2rem; border-radius: .85rem;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4); margin-bottom: .75rem;
+  border: var(--header-border);
+}}
+.peg-header-left {{ display: flex; align-items: center; gap: .85rem; }}
+.peg-logo {{
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; flex: 0 0 auto; background: rgba(255, 255, 255, 0.1);
+  border-radius: .65rem; border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+}}
+.peg-horse {{ width: 30px; height: 30px; display: block; }}
+.peg-titles {{ display: flex; flex-direction: column; line-height: 1.15; }}
+.peg-word {{ font-size: 1.35rem; font-weight: 900; color: #fff; letter-spacing: .1em; margin: 0; }}
+.peg-sub {{ font-size: .72rem; color: #cbd5e1; font-weight: 600; letter-spacing: .04em; margin-top: .1rem; }}
+.peg-badge {{
+  background: rgba(255, 255, 255, 0.12); color: #38bdf8; font-size: .72rem; font-weight: 800;
+  padding: .35rem .75rem; border-radius: 999px; border: 1px solid rgba(56, 189, 248, 0.35);
+  white-space: nowrap; backdrop-filter: blur(6px);
+}}
+
+/* ---- Topbar Search Panel (Frosted Matte Card) ---- */
+.topbar {{
+  background: var(--topbar-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--topbar-border); border-radius: .85rem;
+  padding: .75rem .95rem; margin-bottom: .75rem; box-shadow: 0 8px 24px -4px rgba(0,0,0,0.25);
+}}
+.mini-label {{
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .08em;
+  color: #818cf8; margin-bottom: .25rem; font-weight: 800; display: flex; align-items: center; gap: 4px;
+}}
 
 /* ---- Path Status Cards ---- */
-.path-card {
-  background: rgba(255, 255, 255, 0.85); border-radius: 8px; padding: 6px 10px;
-  border: 1px solid #e2e8f0; font-size: 0.76rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;
-}
-.path-label { font-weight: 700; color: #1e1b4b; display: flex; align-items: center; gap: 6px; }
-.path-val { font-family: monospace; color: #475569; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.path-card {{
+  background: var(--card-bg); border-radius: 6px; padding: 6px 10px;
+  border: 1px solid var(--card-border); font-size: 0.76rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;
+}}
+.path-label {{ font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; }}
+.path-val {{ font-family: monospace; color: var(--text-muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }}
 
-/* ---- Gallery Cards (Modern Elevated Card with Floating Badges) ---- */
-.gallery-card-container {
-  background: rgba(255,255,255,0.82); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  border: 1.5px solid rgba(226,232,240,0.8); border-radius: 12px;
-  padding: 8px; margin-bottom: 14px;
-  box-shadow: 0 4px 16px -2px rgba(0,0,0,0.06);
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+/* ---- Gallery Cards (Modern Matte Cards) ---- */
+.gallery-card-container {{
+  background: var(--card-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid var(--card-border); border-radius: 10px;
+  padding: 7px; margin-bottom: 12px;
+  box-shadow: 0 4px 14px -2px rgba(0,0,0,0.25);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
   position: relative;
-}
-.gallery-card-container:hover {
-  transform: translateY(-5px) scale(1.015);
-  box-shadow: 0 14px 28px -4px rgba(139,92,246,0.22);
-  border-color: #c084fc;
-}
-.gallery-card-container.is-selected {
-  border: 2.5px solid #ec4899;
-  background: rgba(253,242,248,0.92);
-  box-shadow: 0 0 0 4px rgba(236,72,153,0.25), 0 14px 28px -4px rgba(236,72,153,0.3);
-}
+}}
+.gallery-card-container:hover {{
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: 0 12px 24px -4px rgba(0,0,0,0.4);
+  border-color: var(--card-hover-border);
+}}
+.gallery-card-container.is-selected {{
+  border: 2.5px solid var(--card-selected-border);
+  background: var(--card-selected-bg);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25), 0 12px 24px -4px rgba(0,0,0,0.4);
+}}
 
-/* Hero container + Floating Image Badges */
-.hero-wrap {
-  position: relative; border-radius: 8px; overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: #000;
-}
-.hero-wrap img { display:block; width:100%; height:auto; transition: transform 0.3s ease; }
-.hero-wrap:hover img { transform: scale(1.04); }
+/* Hero Image Container */
+.hero-wrap {{
+  position: relative; border-radius: 6px; overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3); background: #000;
+}}
+.hero-wrap img {{ display: block; width: 100%; height: auto; transition: transform 0.25s ease; }}
+.hero-wrap:hover img {{ transform: scale(1.03); }}
 
-.badge-time {
-  position: absolute; top: 6px; left: 6px; z-index: 3;
-  background: rgba(15,23,42,0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  color: #fff; font-size: 0.68rem; font-weight: 800; font-family: monospace;
-  padding: 2px 6px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.25);
-}
-.badge-score {
-  position: absolute; top: 6px; right: 6px; z-index: 3;
+.badge-time {{
+  position: absolute; top: 5px; left: 5px; z-index: 3;
+  background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  color: #f8fafc; font-size: 0.65rem; font-weight: 800; font-family: monospace;
+  padding: 2px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
+}}
+.badge-score {{
+  position: absolute; top: 5px; right: 5px; z-index: 3;
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  font-size: 0.68rem; font-weight: 800;
-  padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.3);
-}
-.badge-score-high { background: rgba(16,185,129,0.88); color: #fff; }
-.badge-score-mid  { background: rgba(245,158,11,0.88); color: #fff; }
-.badge-score-low  { background: rgba(100,116,139,0.85); color: #fff; }
+  font-size: 0.65rem; font-weight: 800;
+  padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.25);
+}}
+.badge-score-high {{ background: var(--badge-score-high); color: #fff; }}
+.badge-score-mid  {{ background: var(--badge-score-mid); color: #fff; }}
+.badge-score-low  {{ background: var(--badge-score-low); color: #fff; }}
 
-.badge-selected-order {
-  position: absolute; bottom: 6px; right: 6px; z-index: 3;
-  background: linear-gradient(135deg, #ec4899, #be123c); color: #fff;
-  font-size: 0.72rem; font-weight: 900; padding: 2px 8px; border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(236,72,153,0.5); border: 1.5px solid #fff;
-}
+.badge-selected-order {{
+  position: absolute; bottom: 5px; right: 5px; z-index: 3;
+  background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff;
+  font-size: 0.7rem; font-weight: 900; padding: 2px 7px; border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4); border: 1.5px solid #fff;
+}}
 
 /* Card metadata info */
-.card-meta {
-  font-size: 0.73rem; color: #334155; line-height: 1.35; margin-top: 6px;
-  background: rgba(248,250,252,0.85); border-radius: 6px; padding: 5px 7px;
-  border: 1px solid rgba(226,232,240,0.8);
-}
-.card-rank { font-weight: 900; color: #7c3aed; font-size: 0.8rem; }
-.card-video { font-weight: 800; color: #0f172a; font-family: monospace; font-size: 0.8rem; }
+.card-meta {{
+  font-size: 0.72rem; color: var(--text-main); line-height: 1.3; margin-top: 5px;
+  background: var(--meta-bg); border-radius: 6px; padding: 4px 6px;
+  border: 1px solid var(--meta-border);
+}}
+.card-rank {{ font-weight: 900; color: #818cf8; font-size: 0.78rem; }}
+.card-video {{ font-weight: 800; color: var(--text-main); font-family: monospace; font-size: 0.78rem; }}
 
 /* 1-Click Copy Button */
-.btn-copy-fast {
-  width: 100%; border: 1.5px solid #cbd5e1; background: #fff; color: #334155;
-  padding: 5px 0; border-radius: 6px; font-size: 0.75rem; font-weight: 700;
+.btn-copy-fast {{
+  width: 100%; border: 1px solid var(--btn-copy-border); background: var(--btn-copy-bg); color: var(--btn-copy-color);
+  padding: 4px 0; border-radius: 5px; font-size: 0.72rem; font-weight: 700;
   cursor: pointer; transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 4px;
-}
-.btn-copy-fast:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
-.btn-copy-fast:active { transform: scale(0.96); }
+}}
+.btn-copy-fast:hover {{ background: var(--btn-copy-hover); color: var(--text-main); }}
+.btn-copy-fast:active {{ transform: scale(0.96); }}
 
-/* ---- Form Submit Button Gradient ---- */
-.stButton > button[data-testid="baseButton-primary"] {
-  background: linear-gradient(105deg, #7c3aed 0%, #db2777 55%, #0891b2 100%) !important;
-  color: #fff !important; font-weight: 900 !important; letter-spacing: .04em;
-  border: none !important; border-radius: .65rem !important; padding: .6rem .75rem !important;
-  box-shadow: 0 6px 18px rgba(219,39,119,0.35) !important;
+/* Inputs & Form Submit Button */
+.stButton > button[data-testid="baseButton-primary"] {{
+  background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%) !important;
+  color: #fff !important; font-weight: 800 !important; letter-spacing: .03em;
+  border: none !important; border-radius: .55rem !important; padding: .55rem .75rem !important;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35) !important;
   transition: transform .15s ease, box-shadow .15s ease !important;
-}
-.stButton > button[data-testid="baseButton-primary"]:hover {
+}}
+.stButton > button[data-testid="baseButton-primary"]:hover {{
   transform: translateY(-2px) !important;
-  box-shadow: 0 10px 24px rgba(124,58,237,0.45) !important;
-}
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.45) !important;
+}}
 
-.stTextInput > div > div > input {
-  border: 1.5px solid #cbd5e1 !important; border-radius: .65rem !important;
-  background: rgba(255,255,255,0.9) !important; color: #0f172a !important;
-  padding: .55rem .75rem !important; font-size: .92rem !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
-  transition: border-color .15s ease, box-shadow .15s ease !important;
-}
-.stTextInput > div > div > input:focus {
-  border-color: #8b5cf6 !important;
-  box-shadow: 0 0 0 3px rgba(139,92,246,0.25) !important;
-}
+.stTextInput > div > div > input {{
+  border: 1.5px solid var(--input-border) !important; border-radius: .55rem !important;
+  background: var(--input-bg) !important; color: var(--input-text) !important;
+  padding: .5rem .75rem !important; font-size: .9rem !important;
+  transition: border-color .15s ease !important;
+}}
+.stTextInput > div > div > input:focus {{
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25) !important;
+}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -748,20 +815,20 @@ def show_video_dialog(
 body {{ background: transparent; overflow: hidden; }}
 .card {{
     background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
-    border: 1.5px solid #6366f1; border-radius: 8px;
+    border: 1.5px solid #4f46e5; border-radius: 8px;
     padding: 8px 14px; display: flex; align-items: center; justify-content: space-between;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
 }}
-.title {{ font-size: 0.7rem; color: #a5b4fc; font-weight: 800; text-transform: uppercase; }}
+.title {{ font-size: 0.68rem; color: #a5b4fc; font-weight: 800; text-transform: uppercase; }}
 .frame-row {{ display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }}
 .frame-label {{ font-size: 0.85rem; color: #cbd5e1; font-weight: 600; }}
-.frame-val {{ font-size: 1.4rem; font-weight: 900; color: #fbbf24; font-family: monospace; background: rgba(0,0,0,0.55); padding: 1px 7px; border-radius: 5px; }}
+.frame-val {{ font-size: 1.35rem; font-weight: 900; color: #38bdf8; font-family: monospace; background: rgba(0,0,0,0.55); padding: 1px 7px; border-radius: 5px; }}
 .time-val {{ font-size: 0.8rem; color: #94a3b8; font-weight: 500; }}
 .btn-copy {{
-    background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
     color: white; border: none; padding: 8px 16px; border-radius: 7px;
-    font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;
-    box-shadow: 0 4px 10px rgba(225, 29, 72, 0.4);
+    font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    box-shadow: 0 4px 10px rgba(2, 132, 199, 0.4);
 }}
 .btn-copy:active {{ transform: scale(0.96); }}
 </style>
@@ -840,7 +907,7 @@ function doCopy() {{
 
     setTimeout(() => {{
         if (btnTxt) btnTxt.innerText = 'BẤM COPY FRAME NÀY';
-        if (btn) btn.style.background = 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)';
+        if (btn) btn.style.background = 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)';
     }}, 2500);
 }}
 
@@ -917,7 +984,7 @@ setInterval(update, 200);
                     with c_k2:
                         st.markdown(
                             f"""<button onclick="navigator.clipboard.writeText('{html.escape(video_id)}, {fid}'); this.innerText='✅';"
-                                       style="width:100%; font-size:0.75rem; padding:4px 0; background:#374151; color:white; border:none; border-radius:4px; cursor:pointer;"
+                                       style="width:100%; font-size:0.75rem; padding:4px 0; background:#334155; color:white; border:none; border-radius:4px; cursor:pointer;"
                                        title="Copy '{video_id}, {fid}'">📋</button>""",
                             unsafe_allow_html=True,
                         )
@@ -1004,7 +1071,7 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                 joined_asr = " ".join(asr_snippets)
                 short_asr = (joined_asr[:55] + "...") if len(joined_asr) > 55 else joined_asr
                 asr_html = (
-                    f'<div style="font-size:0.72rem; color:#3730a3; background:#e0e7ff; '
+                    f'<div style="font-size:0.72rem; color:#818cf8; background:rgba(99, 102, 241, 0.15); '
                     f'border-radius:4px; padding:2px 5px; margin-top:3px; line-height:1.2;" '
                     f'title="{html.escape(joined_asr)}">🗣️ {html.escape(short_asr)}</div>'
                 )
@@ -1015,7 +1082,7 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                 joined_ocr = ", ".join(ocr_labels[:4])
                 short_ocr = (joined_ocr[:50] + "...") if len(joined_ocr) > 50 else joined_ocr
                 ocr_html = (
-                    f'<div style="font-size:0.72rem; color:#047857; background:#d1fae5; '
+                    f'<div style="font-size:0.72rem; color:#34d399; background:rgba(16, 185, 129, 0.15); '
                     f'border-radius:4px; padding:2px 5px; margin-top:2px; line-height:1.2;" '
                     f'title="{html.escape(", ".join(ocr_labels))}">🔤 {html.escape(short_ocr)}</div>'
                 )
@@ -1024,8 +1091,8 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
             judge_reason = item.metadata.get("vlm_judge_reason") if item.metadata else None
             judge_html = ""
             if judge_score is not None:
-                badge_bg = "#ecfdf5" if float(judge_score) >= 70 else "#fef3c7"
-                badge_color = "#065f46" if float(judge_score) >= 70 else "#92400e"
+                badge_bg = "rgba(16, 185, 129, 0.2)" if float(judge_score) >= 70 else "rgba(245, 158, 11, 0.2)"
+                badge_color = "#34d399" if float(judge_score) >= 70 else "#fbbf24"
                 judge_label = "🎯 Bằng chứng QA" if query.type == "qa" else "⚖️ VLM Judge"
                 judge_html = (
                     f'<div style="font-size:0.72rem; font-weight:700; color:{badge_color}; background:{badge_bg}; '
@@ -1081,13 +1148,13 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
         event_frames = item.event_frames or []
 
         st.markdown(
-            f'<div style="background: rgba(255,255,255,0.85); border: 2px solid {"#ec4899" if is_sel else "#e2e8f0"}; '
-            f'border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">'
+            f'<div style="background: var(--card-bg); border: 2px solid {"var(--card-selected-border)" if is_sel else "var(--card-border)"}; '
+            f'border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.25);">'
             f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">'
-            f'  <div><span style="font-weight:900; color:#7c3aed; font-size:1.15rem;">#{idx + 1}</span> '
+            f'  <div><span style="font-weight:900; color:#818cf8; font-size:1.15rem;">#{idx + 1}</span> '
             f'  <span style="font-weight:800; font-size:1.05rem; margin-left:6px;">📹 Video: <code>{html.escape(item.video_id)}</code></span> · '
-            f'  <span style="font-size:0.88rem; color:#64748b;">Độ khớp chuỗi: <b>{item.score:.3f}</b></span></div>'
-            f'  <span style="background: #ede9fe; color:#6d28d9; padding: 3px 10px; border-radius: 999px; font-weight:700; font-size:0.78rem;">'
+            f'  <span style="font-size:0.88rem; color:var(--text-muted);">Độ khớp chuỗi: <b>{item.score:.3f}</b></span></div>'
+            f'  <span style="background: rgba(99, 102, 241, 0.2); color:#a5b4fc; padding: 3px 10px; border-radius: 999px; font-weight:700; font-size:0.78rem;">'
             f'  Chuỗi {len(event_frames)} hành động {f"(Chọn #{sel_order})" if is_sel else ""}</span>'
             f'</div>',
             unsafe_allow_html=True,
@@ -1103,7 +1170,7 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                 ev_ts = get_frame_timestamp(item.video_id, frame_id, map_dir)
                 with col:
                     st.markdown(
-                        f'<div style="font-size:0.78rem; font-weight:800; color:#1e1b4b; background:#f1f5f9; '
+                        f'<div style="font-size:0.78rem; font-weight:800; color:var(--text-main); background:var(--meta-bg); '
                         f'padding:3px 6px; border-radius:6px; margin-bottom:4px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" '
                         f'title="{html.escape(ev_text)}">'
                         f'#{ev_idx + 1}: {html.escape(ev_text)}</div>',
@@ -1164,11 +1231,11 @@ st.markdown(
 
 
 # ===========================================================================
-# TOPBAR SEARCH PANEL
+# TOPBAR CONTROL PANEL (4 Cột Tinh Gọn)
 # ===========================================================================
 st.markdown('<div class="topbar">', unsafe_allow_html=True)
 
-top_c1, top_c2, top_c3 = st.columns([1.1, 2.1, 1.8], gap="small")
+top_c1, top_c2, top_c3, top_c4 = st.columns([1.1, 1.8, 1.8, 0.9], gap="small")
 with top_c1:
     st.markdown('<div class="mini-label">🎯 Luồng bài toán</div>', unsafe_allow_html=True)
     query_type = st.segmented_control(
@@ -1179,7 +1246,7 @@ with top_c1:
         label_visibility="collapsed",
     )
 with top_c2:
-    st.markdown('<div class="mini-label">⚡ Chế độ tìm kiếm (Modality)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="mini-label">⚡ Chế độ tìm kiếm</div>', unsafe_allow_html=True)
     search_mode = st.segmented_control(
         "Chế độ",
         ["hybrid", "siglip", "asr", "ocr"],
@@ -1194,20 +1261,33 @@ with top_c2:
         label_visibility="collapsed",
     )
 with top_c3:
-    st.markdown('<div class="mini-label">🤖 Mô hình Thị giác (Vision Model)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="mini-label">🤖 Mô hình Thị giác</div>', unsafe_allow_html=True)
     model_choice = st.selectbox(
         "Mô hình",
-        ["siglip2", "siglip", "siglip2-base", "clip-l14"],
+        ["siglip2", "siglip", "clip-l14", "siglip2-base"],
         format_func=lambda x: {
             "siglip2": "🚀 SigLIP 2 (SO400M - SOTA)",
             "siglip": "👁️ SigLIP (SO400M - Chuẩn)",
+            "clip-l14": "🎨 OpenAI CLIP (Derived)",
             "siglip2-base": "⚡ SigLIP 2 Base (ViT-B-16)",
-            "clip-l14": "🎨 OpenAI CLIP ViT-L-14 (Derived)",
         }.get(x, x),
         index=0,
         key="selected_model_choice",
         label_visibility="collapsed",
     )
+with top_c4:
+    st.markdown('<div class="mini-label">🌓 Giao diện</div>', unsafe_allow_html=True)
+    theme_choice = st.selectbox(
+        "Theme",
+        ["midnight", "light"],
+        format_func=lambda x: "🌙 Tối Dịu" if x == "midnight" else "☁️ Sáng Dịu",
+        index=0 if current_theme == "midnight" else 1,
+        key="theme_selector",
+        label_visibility="collapsed",
+    )
+    if theme_choice != current_theme:
+        st.session_state["app_theme"] = theme_choice
+        st.rerun()
 
 question = ""
 events_text = ""
@@ -1247,6 +1327,7 @@ with chip_col1:
     if st.button("🚗 Xe tự hành (QA)", key="chip_qa_car", **_FULL_WIDTH):
         st.session_state["query_type"] = "qa"
         st.session_state["search_mode"] = "siglip"
+        st.session_state["selected_model_choice"] = "siglip2"
         st.session_state["query_text"] = "The clip was filmed from inside a self-driving car; the steering wheel can be clearly seen turning to the right. The camera angle then shifts to the outside, capturing the white car turning left, with a red sign bearing six Chinese characters visible in the upper part of the frame."
         st.session_state["query_question"] = "What number is displayed on the side of the white car?"
         st.session_state["_run_agent"] = True
@@ -1255,6 +1336,7 @@ with chip_col2:
     if st.button("🍳 Đầu bếp (KIS)", key="chip_kis_cook", **_FULL_WIDTH):
         st.session_state["query_type"] = "kis"
         st.session_state["search_mode"] = "hybrid"
+        st.session_state["selected_model_choice"] = "siglip2"
         st.session_state["query_text"] = "Một đầu bếp chế biến món ăn trong chảo, với các miếng dồi trường màu trắng và rau xanh. Đầu bếp cho bông hẹ vào chảo."
         st.session_state["cfg_translate"] = True
         st.session_state["_run_agent"] = True
@@ -1263,6 +1345,7 @@ with chip_col3:
     if st.button("🚶‍♂️ Lấy nước (TRAKE)", key="chip_trake_fridge", **_FULL_WIDTH):
         st.session_state["query_type"] = "trake"
         st.session_state["search_mode"] = "siglip"
+        st.session_state["selected_model_choice"] = "siglip2"
         st.session_state["query_events"] = "A person opens the refrigerator\nThe person takes out a bottle of water\nThe person drinks water from the bottle"
         st.session_state["_run_agent"] = True
         st.rerun()
@@ -1420,10 +1503,10 @@ else:
                 opts = "".join([f'<option value="{html.escape(vid)}">{html.escape(vid)}</option>' for vid in video_options])
                 filter_html = f"""
                 <div>
-                    <label style="font-weight: 800; color: #1e1b4b; font-size: 0.8rem; display: block; margin-bottom: 3px;">🎬 Lọc nhanh video</label>
+                    <label style="font-weight: 800; font-size: 0.8rem; display: block; margin-bottom: 3px;">🎬 Lọc nhanh video</label>
                     <select id="client-video-filter" onchange="window.filterKeyframes(this.value)" style="
-                        width: 100%; padding: 5px 8px; border-radius: 6px; border: 1.5px solid #cbd5e1;
-                        background: #fff; color: #1e1b4b; font-size: 0.85rem; height: 36px; font-weight: 600;
+                        width: 100%; padding: 5px 8px; border-radius: 6px; border: 1.5px solid var(--input-border);
+                        background: var(--input-bg); color: var(--input-text); font-size: 0.85rem; height: 36px; font-weight: 600;
                     ">
                         <option value="Tất cả">Tất cả ({len(video_options)} videos)</option>
                         {opts}
@@ -1453,7 +1536,7 @@ else:
                 """
                 st.markdown(filter_html, unsafe_allow_html=True)
         with col_vid_quick:
-            st.markdown('<label style="font-weight: 800; color: #1e1b4b; font-size: 0.8rem; display: block; margin-bottom: 3px;">⚡ Xem Video Top #1 (Phím: V/K)</label>', unsafe_allow_html=True)
+            st.markdown('<label style="font-weight: 800; font-size: 0.8rem; display: block; margin-bottom: 3px;">⚡ Xem Video Top #1 (Phím: V/K)</label>', unsafe_allow_html=True)
             if candidates and st.button("🎬 Mở Video #1", key="btn_quick_vid_top1", **_FULL_WIDTH, help="Mở video & duyệt keyframes của Candidate #1"):
                 top_cand = candidates[0]
                 show_video_dialog(
@@ -1467,7 +1550,7 @@ else:
         with col_limit:
             max_show = st.number_input("Số ảnh hiển thị", min_value=1, max_value=total, value=min(20, total), step=5, key="max_show_input")
         with col_all:
-            st.markdown('<label style="font-weight: 800; color: #1e1b4b; font-size: 0.8rem; display: block; margin-bottom: 3px;">&nbsp;</label>', unsafe_allow_html=True)
+            st.markdown('<label style="font-weight: 800; font-size: 0.8rem; display: block; margin-bottom: 3px;">&nbsp;</label>', unsafe_allow_html=True)
             if st.button("Chọn tất cả", **_FULL_WIDTH):
                 vis_idx = [i for i, c in enumerate(candidates) if (selected_video == "Tất cả" or c.video_id == selected_video)][:max_show]
                 for i in vis_idx:
