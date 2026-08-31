@@ -81,7 +81,8 @@ D:\ai_challenge\data\ (Thư mục dữ liệu bên ngoài)
 │   └── Videos/                           # (Tùy chọn) File video .mp4 gốc
 └── processed/                            # Dữ liệu index đã xử lý (đầu ra của hệ thống)
     ├── siglip2_manifest.jsonl            # Manifest SigLIP 2 (vector_id, frame_id, labels, asr_text)
-    ├── siglip2_features.npy              # Ma trận vector SigLIP 2 tương ứng
+    ├── siglip2_features.npy              # Ma trận vector SigLIP 2 (177.321 x 1152)
+    ├── asr_dense_features.npy            # Ma trận vector ngữ nghĩa lời thoại BGE-M3 (177.321 x 1024)
     ├── siglip_manifest.jsonl             # Manifest SigLIP 1
     ├── siglip_features.npy               # Ma trận vector SigLIP 1
     ├── derived_manifest.jsonl            # Manifest hiện có
@@ -152,23 +153,31 @@ python -m aic2026.cli check-features "D:\ai_challenge\data\processed\siglip2_fea
 Giao diện đã được cấu hình tự động nhận diện chính xác các đường dẫn trên máy bạn:
 * **Manifest Path:** `D:\ai_challenge\data\processed\siglip2_manifest.jsonl` (hoặc `siglip_manifest.jsonl` / `derived_manifest.jsonl`)
 * **Features Path:** `D:\ai_challenge\data\processed\siglip2_features.npy` (hoặc `siglip_features.npy` / `derived_features.npy`)
+* **Dense ASR Features Path:** `D:\ai_challenge\data\processed\asr_dense_features.npy` (mã hóa ngữ nghĩa BGE-M3)
 * **Keyframes Dir:** `D:\ai_challenge\data\extracted\Keyframes`
 * **Map Keyframes Dir:** `D:\ai_challenge\data\extracted\map-keyframes`
 * **Videos Dir:** `D:\ai_challenge\data\extracted\Videos` (nếu có)
 
 ---
 
-## 5. Tính Năng VLM-as-a-Judge (Qwen2.5-VL)
+## 5. Tính Năng VLM-as-a-Judge & Dense Semantic ASR
 
-Hệ thống tích hợp **Qwen2.5-VL-7B** làm "Trọng tài thị giác" (Visual Verifier & Reranker) cho cả 3 bài toán:
+### 5.1. VLM-as-a-Judge (Qwen2.5-VL)
+Hệ thống tích hợp **Qwen2.5-VL-3B** (hoặc 7B) làm "Trọng tài thị giác" (Visual Verifier & Reranker) cho cả 3 bài toán:
 
 * **🔍 KIS (Known Item Search)**: VLM "nhìn" từng frame trong Top 15, phân tích chi tiết điều kiện (màu sắc, vật thể, hành động, graffiti, tranh vẽ...) và chấm điểm 0–100 $\rightarrow$ Đưa frame đúng nhất lên Top 1.
 * **🎯 Q&A (Visual Evidence Verifier)**: Thẩm định xem ảnh ứng viên có chứa **bằng chứng trực tiếp** để trả lời câu hỏi hay không $\rightarrow$ Đưa frame có đáp án lên Top 1 để bạn tự quan sát và gõ câu trả lời vào bài nộp (tránh AI hallucinate).
 * **⏱️ TRAKE (Temporal Sequence Verifier)**: Thẩm định chuỗi đa ảnh $(f_1 \to f_2 \to \dots \to f_N)$, kiểm tra từng frame có khớp với từng event trong chuỗi thời gian hay không.
 
-### ⚙️ Cách Kích Hoạt VLM Judge:
-* **Trên Web UI**: Mở **Cấu hình nâng cao** (Sidebar) $\rightarrow$ Tích chọn `[x] ⚖️ Kích hoạt VLM-as-a-Judge (Qwen2.5-VL)`.
-* **Trên CLI**: Thêm cờ `--vlm-judge --vlm-judge-model "Qwen/Qwen2.5-VL-7B-Instruct" --vlm-judge-top-k 15`.
+#### ⚙️ Cách Kích Hoạt VLM Judge:
+* **Trên Web UI**: Mở **Cấu hình nâng cao** (Sidebar) $\rightarrow$ Tích chọn `[x] ⚖️ Kích hoạt VLM-as-a-Judge (Qwen2.5-VL)`. Mặc định sử dụng model `Qwen/Qwen2.5-VL-3B-Instruct` (cực nhanh ~0.3s/ảnh, tối ưu hoàn hảo cho 12GB VRAM RTX 4070).
+* **Trên CLI**: Thêm cờ `--vlm-judge --vlm-judge-model "Qwen/Qwen2.5-VL-3B-Instruct" --vlm-judge-top-k 15`.
+
+### 5.2. Dense Semantic Speech Retrieval (BGE-M3 1024-dim)
+* Sử dụng mô hình **`BAAI/bge-m3`** mã hóa toàn bộ câu thoại ASR thành vector ngữ nghĩa 1024 chiều.
+* Tự động kết hợp **Hybrid Dense-Sparse**:
+  $$\text{Score}_{\text{ASR}} = 0.65 \cdot \text{Dense}_{\text{BGE-M3}} + 0.35 \cdot \text{Sparse}_{\text{BM25}}$$
+* Bắt trúng câu thoại kể cả khi query dùng từ đồng nghĩa hoặc diễn giải gián tiếp (ví dụ: *"hoàn cảnh nghèo khó"* $\leftrightarrow$ *"mẹ mất sớm, không có tiền đóng học"*).
 
 ---
 
