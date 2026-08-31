@@ -75,6 +75,8 @@ class RuntimeConfig(BaseModel):
     search_mode: str = "hybrid"
     vlm_backend: str = "none"
     vlm_model: str = "microsoft/Florence-2-base-ft"
+    vlm_device: str | None = None
+    vlm_dtype: str = "float32"
     vlm_timeout: int = 120
     coarse_top_k: int = 200
     vlm_judge_enabled: bool = False
@@ -346,10 +348,10 @@ def run_qa_candidates(request: TaskRequest) -> AgentResult:
             translate_query=config.translate_query,
             # VLM không cần cho phase-1: truyền vlm_backend="none" để bỏ qua
             vlm_backend="none",
-            vlm_model=config.vlm_model,
-            vlm_device=config.vlm_device,
-            vlm_dtype=config.vlm_dtype,
-            vlm_timeout=config.vlm_timeout,
+            vlm_model=getattr(config, "vlm_model", "microsoft/Florence-2-base-ft"),
+            vlm_device=getattr(config, "vlm_device", None),
+            vlm_dtype=getattr(config, "vlm_dtype", "float32"),
+            vlm_timeout=getattr(config, "vlm_timeout", 120),
             late_interaction_weight=config.late_interaction_weight,
             query_type="qa",
             clip_model=config.clip_model,
@@ -415,9 +417,9 @@ def run_qa_answers(request: AnswerRequest) -> dict[str, str]:
         from aic2026.qa.florence import FlorenceVLM
 
         florence = FlorenceVLM(
-            model_name=config.vlm_model,
-            device=config.vlm_device,
-            torch_dtype=config.vlm_dtype,
+            model_name=getattr(config, "vlm_model", "microsoft/Florence-2-base-ft"),
+            device=getattr(config, "vlm_device", None),
+            torch_dtype=getattr(config, "vlm_dtype", "float32"),
         )
         answers = florence.answer_question(request.question, candidates)
     except Exception as error:
