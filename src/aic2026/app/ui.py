@@ -63,51 +63,93 @@ def _detect_default_path(candidates: list[str]) -> str:
     return candidates[0]
 
 
-DEFAULT_MANIFEST = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\processed\siglip_manifest.jsonl",
-    r"D:\bachkhoa\ai_challenge\data\processed\siglip2_manifest.jsonl",
-    r"D:\ai_challenge\data\processed\siglip2_manifest.jsonl",
-    r"D:\ai_challenge\data\processed\siglip_manifest.jsonl",
-    "data/processed/siglip_manifest.jsonl",
-    "data/processed/siglip2_manifest.jsonl",
-    "data/processed/derived_manifest.jsonl",
-    "data/processed/official_manifest.jsonl",
+DEFAULT_MASTER_ROOT = _detect_default_path([
+    r"D:\bachkhoa\ai_challenge",
+    r"D:\bachkhoa\ai_challenge\data",
+    r"D:\ai_challenge",
+    r"D:\ai_challenge\data",
+    "data",
 ])
-DEFAULT_FEATURES = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\processed\siglip_features.npy",
-    r"D:\bachkhoa\ai_challenge\data\processed\siglip2_features.npy",
-    r"D:\ai_challenge\data\processed\siglip2_features.npy",
-    r"D:\ai_challenge\data\processed\siglip_features.npy",
-    "data/processed/siglip_features.npy",
-    "data/processed/siglip2_features.npy",
-    "data/processed/derived_features.npy",
-    "data/processed/official_features.npy",
-])
-DEFAULT_ROOT = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes",
-    r"D:\bachkhoa\ai_challenge\data\extracted",
-    r"D:\ai_challenge\data\extracted\Keyframes",
-    r"D:\ai_challenge\data\extracted",
-    "data/raw/Keyframes",
-    "data/processed",
-])
-DEFAULT_VIDEOS_ROOT = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\extracted\Videos",
-    r"D:\ai_challenge\data\extracted\Videos",
-    "data/extracted/Videos",
-    "data/raw/Videos",
-])
-DEFAULT_MAP_KEYFRAMES = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\extracted\map-keyframes",
-    r"D:\ai_challenge\data\extracted\map-keyframes",
-    "data/extracted/map-keyframes",
-    "data/raw/map-keyframes",
-])
-DEFAULT_ASR_FEATURES = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge\data\processed\asr_dense_features.npy",
-    r"D:\ai_challenge\data\processed\asr_dense_features.npy",
-    "data/processed/asr_dense_features.npy",
-])
+
+
+def resolve_data_root_and_paths(base_str: str) -> dict[str, str]:
+    """
+    Tự động suy luận toàn bộ các đường dẫn con từ 1 đường dẫn gốc duy nhất.
+    Ví dụ: Người dùng chỉ cần nhập 'D:\bachkhoa\ai_challenge' hoặc 'D:\bachkhoa\ai_challenge\data',
+    hệ thống sẽ tự động tìm thấy manifest, features, keyframes, videos, map-keyframes.
+    """
+    cleaned = (base_str or "").strip(" '\"")
+    base = Path(cleaned) if cleaned else Path("data")
+    
+    if (base / "data").exists() and (base / "data").is_dir():
+        data_dir = base / "data"
+    else:
+        data_dir = base
+
+    # 1. Manifest
+    manifest_candidates = [
+        data_dir / "processed" / "siglip_manifest.jsonl",
+        data_dir / "processed" / "siglip2_manifest.jsonl",
+        data_dir / "processed" / "derived_manifest.jsonl",
+        data_dir / "processed" / "official_manifest.jsonl",
+    ]
+    manifest = next((c for c in manifest_candidates if c.exists()), manifest_candidates[0])
+
+    # 2. Features
+    feature_candidates = [
+        data_dir / "processed" / "siglip_features.npy",
+        data_dir / "processed" / "siglip2_features.npy",
+        data_dir / "processed" / "derived_features.npy",
+        data_dir / "processed" / "official_features.npy",
+    ]
+    features = next((c for c in feature_candidates if c.exists()), feature_candidates[0])
+
+    # 3. Dense ASR
+    asr_dense = data_dir / "processed" / "asr_dense_features.npy"
+
+    # 4. Keyframes
+    kf_candidates = [
+        data_dir / "extracted" / "Keyframes",
+        data_dir / "extracted",
+        data_dir / "raw" / "Keyframes",
+    ]
+    keyframes = next((c for c in kf_candidates if c.exists()), kf_candidates[0])
+
+    # 5. Videos
+    vid_candidates = [
+        data_dir / "extracted" / "Videos",
+        data_dir / "Videos",
+        data_dir / "raw" / "Videos",
+    ]
+    videos = next((c for c in vid_candidates if c.exists()), vid_candidates[0])
+
+    # 6. Map Keyframes
+    map_candidates = [
+        data_dir / "extracted" / "map-keyframes",
+        data_dir / "map-keyframes",
+        data_dir / "raw" / "map-keyframes",
+    ]
+    map_keyframes = next((c for c in map_candidates if c.exists()), map_candidates[0])
+
+    return {
+        "data_dir": str(data_dir),
+        "manifest": str(manifest),
+        "features": str(features),
+        "asr_features": str(asr_dense),
+        "keyframes": str(keyframes),
+        "videos": str(videos),
+        "map_keyframes": str(map_keyframes),
+    }
+
+
+# Initial default paths
+_INIT_PATHS = resolve_data_root_and_paths(DEFAULT_MASTER_ROOT)
+DEFAULT_MANIFEST = _INIT_PATHS["manifest"]
+DEFAULT_FEATURES = _INIT_PATHS["features"]
+DEFAULT_ROOT = _INIT_PATHS["keyframes"]
+DEFAULT_VIDEOS_ROOT = _INIT_PATHS["videos"]
+DEFAULT_MAP_KEYFRAMES = _INIT_PATHS["map_keyframes"]
+DEFAULT_ASR_FEATURES = _INIT_PATHS["asr_features"]
 DEFAULT_CLIP_MODEL = "siglip2" if "siglip2" in DEFAULT_FEATURES else "ViT-SO400M-14-SigLIP-384"
 DEFAULT_CLIP_PRETRAINED = "webli"
 
@@ -166,6 +208,14 @@ html, body, [data-testid="stAppViewContainer"] { font-family: -apple-system, Bli
 }
 .mini-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.08em;
   color:#6366f1; margin-bottom:.25rem; font-weight:800; display:flex; align-items:center; gap:4px; }
+
+/* ---- Path Status Cards ---- */
+.path-card {
+  background: rgba(255, 255, 255, 0.85); border-radius: 8px; padding: 6px 10px;
+  border: 1px solid #e2e8f0; font-size: 0.76rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;
+}
+.path-label { font-weight: 700; color: #1e1b4b; display: flex; align-items: center; gap: 6px; }
+.path-val { font-family: monospace; color: #475569; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
 
 /* ---- Gallery Cards (Modern Elevated Card with Floating Badges) ---- */
 .gallery-card-container {
@@ -664,7 +714,7 @@ def show_video_dialog(
         else:
             st.warning(
                 f"⚠️ Không tìm thấy file video `{video_id}.mp4` trong `{videos_root or DEFAULT_VIDEOS_ROOT}`.\n\n"
-                f"Hãy kiểm tra lại đường dẫn video trong 'Cấu hình nâng cao'."
+                f"Hãy kiểm tra lại đường dẫn video trong 'Cấu hình đường dẫn dữ liệu'."
             )
 
         # Tracker Frame HTML5
@@ -1195,6 +1245,50 @@ with tr_col:
         help="Dịch truy vấn tiếng Việt sang tiếng Anh trước khi đưa vào SigLIP. Bật khi nhập tiếng Việt.",
     )
 
+# ---------------------------------------------------------------------------
+# Cấu hình 1-Click Master Root: Tự động ánh xạ toàn bộ đường dẫn con
+# ---------------------------------------------------------------------------
+with st.expander("📂 Cấu hình Thư mục Dữ liệu Gốc (Chỉ cần điền 1 lần)", expanded=False):
+    master_root_input = st.text_input(
+        "📂 Thư mục Gốc Dự án / Data (Master Root):",
+        value=st.session_state.get("cfg_master_root", DEFAULT_MASTER_ROOT),
+        key="cfg_master_root",
+        help="Ví dụ: D:\\bachkhoa\\ai_challenge hoặc D:\\bachkhoa\\ai_challenge\\data. Hệ thống sẽ tự động tìm thấy toàn bộ manifest, features, keyframes, videos, map-keyframes!",
+    )
+    
+    # Auto-resolve all paths from single root input
+    auto_paths = resolve_data_root_and_paths(master_root_input)
+    
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["manifest"]).exists() else "🔴"} Manifest JSONL</span><span class="path-val" title="{auto_paths["manifest"]}">{auto_paths["manifest"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["features"]).exists() else "🔴"} SigLIP Features (.npy)</span><span class="path-val" title="{auto_paths["features"]}">{auto_paths["features"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["asr_features"]).exists() else "⚪"} Dense ASR Features</span><span class="path-val" title="{auto_paths["asr_features"]}">{auto_paths["asr_features"]}</span></div>', unsafe_allow_html=True)
+    with col_p2:
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["keyframes"]).exists() else "🔴"} Keyframes Dir</span><span class="path-val" title="{auto_paths["keyframes"]}">{auto_paths["keyframes"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["videos"]).exists() else "⚪"} Videos (.mp4) Dir</span><span class="path-val" title="{auto_paths["videos"]}">{auto_paths["videos"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["map_keyframes"]).exists() else "⚪"} Map Keyframes (.csv)</span><span class="path-val" title="{auto_paths["map_keyframes"]}">{auto_paths["map_keyframes"]}</span></div>', unsafe_allow_html=True)
+
+    with st.expander("🔧 Tùy chỉnh chi tiết từng file riêng lẻ (Tùy chọn nâng cao)", expanded=False):
+        st.text_input("Backend API", "http://127.0.0.1:8000", key="cfg_backend")
+        st.text_input("Manifest JSONL", auto_paths["manifest"], key="cfg_manifest")
+        st.text_input("Feature .npy", auto_paths["features"], key="cfg_features")
+        st.text_input("Dense ASR Feature .npy (BGE-M3)", auto_paths["asr_features"], key="cfg_asr_features")
+        st.text_input("Root Keyframes", auto_paths["keyframes"], key="cfg_root")
+        st.text_input("Root Videos (.mp4)", auto_paths["videos"], key="cfg_videos_root")
+        st.text_input("Thư mục map-keyframes (.csv)", auto_paths["map_keyframes"], key="cfg_map_keyframes")
+        st.text_input("CLIP / SigLIP model", DEFAULT_CLIP_MODEL, key="cfg_clip_model")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# Lấy các đường dẫn thực thi: Ưu tiên override nếu có, fallback về auto_paths
+active_manifest = st.session_state.get("cfg_manifest") or auto_paths["manifest"]
+active_features = st.session_state.get("cfg_features") or auto_paths["features"]
+active_asr_features = st.session_state.get("cfg_asr_features") or auto_paths["asr_features"]
+active_root = st.session_state.get("cfg_root") or auto_paths["keyframes"]
+active_videos_root = st.session_state.get("cfg_videos_root") or auto_paths["videos"]
+active_map_keyframes = st.session_state.get("cfg_map_keyframes") or auto_paths["map_keyframes"]
+
 if st.session_state.get("_run_agent"):
     st.session_state["_run_agent"] = False
     if not text.strip() and not (query_type == "trake" and events_text.strip()):
@@ -1206,8 +1300,8 @@ if st.session_state.get("_run_agent"):
                 st.error("TRAKE cần ít nhất một event.")
             else:
                 runtime = {
-                    "manifest_path": st.session_state.get("cfg_manifest", DEFAULT_MANIFEST),
-                    "features_path": st.session_state.get("cfg_features", DEFAULT_FEATURES),
+                    "manifest_path": active_manifest,
+                    "features_path": active_features,
                     "clip_model": st.session_state.get("cfg_clip_model", DEFAULT_CLIP_MODEL),
                     "clip_pretrained": st.session_state.get("cfg_clip", DEFAULT_CLIP_PRETRAINED),
                     "llm_model": st.session_state.get("cfg_llm", "qwen3.5:4b"),
@@ -1230,7 +1324,7 @@ if st.session_state.get("_run_agent"):
                     query=query,
                     candidates=result.candidates,
                     trace=result.trace,
-                    raw_root=st.session_state.get("cfg_root", DEFAULT_ROOT),
+                    raw_root=active_root,
                     manifest_path=runtime["manifest_path"],
                     selected=[],
                     _query_nonce=st.session_state.get("_query_nonce", 0) + 1,
@@ -1256,18 +1350,6 @@ if st.session_state.get("_run_agent"):
         except (BackendRequestError, ValidationError) as error:
             st.error(f"Không chạy được agent: {error}")
 
-with st.expander("⚙️ Cấu hình nâng cao & Đường dẫn dữ liệu"):
-    st.text_input("Backend API", "http://127.0.0.1:8000", key="cfg_backend")
-    st.text_input("Manifest JSONL", DEFAULT_MANIFEST, key="cfg_manifest")
-    st.text_input("Feature .npy", DEFAULT_FEATURES, key="cfg_features")
-    st.text_input("Dense ASR Feature .npy (BGE-M3)", DEFAULT_ASR_FEATURES, key="cfg_asr_features", help="Ma trận vector ngữ nghĩa lời thoại 1024-dim sinh bởi `aic2026 embed-asr`")
-    st.text_input("Root Keyframes", DEFAULT_ROOT, key="cfg_root")
-    st.text_input("Root Videos (.mp4)", DEFAULT_VIDEOS_ROOT, key="cfg_videos_root")
-    st.text_input("Thư mục map-keyframes (.csv)", DEFAULT_MAP_KEYFRAMES, key="cfg_map_keyframes")
-    st.text_input("CLIP / SigLIP model", DEFAULT_CLIP_MODEL, key="cfg_clip_model")
-
-st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ===========================================================================
 # GALLERY TRUNG TÂM
@@ -1277,7 +1359,7 @@ if "candidates" not in st.session_state:
 else:
     query: Query = st.session_state["query"]
     candidates: list[Candidate] = st.session_state["candidates"]
-    root = Path(st.session_state.get("raw_root", DEFAULT_ROOT))
+    root = Path(st.session_state.get("raw_root", active_root))
     if "selected" not in st.session_state or not isinstance(st.session_state["selected"], list):
         st.session_state["selected"] = []
     selected: list[int] = st.session_state["selected"]
@@ -1338,10 +1420,10 @@ else:
                 show_video_dialog(
                     video_id=top_cand.video_id,
                     initial_frame_id=top_cand.frame_id,
-                    manifest_path=st.session_state.get("manifest_path"),
+                    manifest_path=st.session_state.get("manifest_path", active_manifest),
                     keyframes_root=root,
-                    videos_root=st.session_state.get("cfg_videos_root", DEFAULT_VIDEOS_ROOT),
-                    map_dir=st.session_state.get("cfg_map_keyframes", DEFAULT_MAP_KEYFRAMES),
+                    videos_root=st.session_state.get("cfg_videos_root", active_videos_root),
+                    map_dir=st.session_state.get("cfg_map_keyframes", active_map_keyframes),
                 )
         with col_limit:
             max_show = st.number_input("Số ảnh hiển thị", min_value=1, max_value=total, value=min(20, total), step=5, key="max_show_input")

@@ -168,6 +168,7 @@ def load_orchestrator(
     asr_dense_file = None
     for cand_asr in (
         manifest_file.parent / "asr_dense_features.npy",
+        Path(r"D:\bachkhoa\ai_challenge\data\processed\asr_dense_features.npy"),
         Path(r"D:\ai_challenge\data\processed\asr_dense_features.npy"),
         Path("data/processed/asr_dense_features.npy"),
     ):
