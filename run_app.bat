@@ -25,20 +25,20 @@ set "PYTHONPATH=src;%PYTHONPATH%"
 where uv >nul 2>&1
 if %errorlevel% equ 0 (
     echo [*] Khoi dong bang uv...
-    uv run streamlit run src/aic2026/app/ui.py --server.port 8501 --server.headless false
+    uv run streamlit run src/aic2026/app/ui.py --server.port 8501 --server.headless false --server.fileWatcherType none --server.enableWebsocketCompression false --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false
     goto finish
 )
 
 :: 2. Dung moi truong ao .venv
 if exist ".venv\Scripts\streamlit.exe" (
     echo [*] Khoi dong bang .venv...
-    .venv\Scripts\streamlit.exe run src/aic2026/app/ui.py --server.port 8501 --server.headless false
+    .venv\Scripts\streamlit.exe run src/aic2026/app/ui.py --server.port 8501 --server.headless false --server.fileWatcherType none --server.enableWebsocketCompression false --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false
     goto finish
 )
 
 :: 3. Dung python he thong
 echo [*] Khoi dong bang python he thong...
-python -m streamlit run src/aic2026/app/ui.py --server.port 8501 --server.headless false
+python -m streamlit run src/aic2026/app/ui.py --server.port 8501 --server.headless false --server.fileWatcherType none --server.enableWebsocketCompression false --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false
 
 :finish
 if %errorlevel% neq 0 (
