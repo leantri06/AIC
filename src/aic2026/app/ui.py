@@ -72,11 +72,11 @@ DEFAULT_MASTER_ROOT = _detect_default_path([
 ])
 
 
-def resolve_data_root_and_paths(base_str: str) -> dict[str, str]:
+def resolve_data_root_and_paths(base_str: str, model_choice: str = "siglip2") -> dict[str, str]:
     """
-    Tự động suy luận toàn bộ các đường dẫn con từ 1 đường dẫn gốc duy nhất.
+    Tự động suy luận toàn bộ các đường dẫn con từ 1 đường dẫn gốc duy nhất và lựa chọn mô hình.
     Ví dụ: Người dùng chỉ cần nhập 'D:\bachkhoa\ai_challenge' hoặc 'D:\bachkhoa\ai_challenge\data',
-    hệ thống sẽ tự động tìm thấy manifest, features, keyframes, videos, map-keyframes.
+    hệ thống sẽ tự động tìm thấy manifest, features, keyframes, videos, map-keyframes tương ứng với mô hình.
     """
     cleaned = (base_str or "").strip(" '\"")
     base = Path(cleaned) if cleaned else Path("data")
@@ -86,22 +86,41 @@ def resolve_data_root_and_paths(base_str: str) -> dict[str, str]:
     else:
         data_dir = base
 
+    model_configs = {
+        "siglip2": {
+            "clip_model": "siglip2",
+            "clip_pretrained": "webli",
+            "manifest_names": ["siglip2_manifest.jsonl", "siglip_manifest.jsonl", "derived_manifest.jsonl", "official_manifest.jsonl"],
+            "feature_names": ["siglip2_features.npy", "siglip_features.npy", "derived_features.npy", "official_features.npy"],
+        },
+        "siglip": {
+            "clip_model": "siglip",
+            "clip_pretrained": "webli",
+            "manifest_names": ["siglip_manifest.jsonl", "siglip2_manifest.jsonl", "derived_manifest.jsonl", "official_manifest.jsonl"],
+            "feature_names": ["siglip_features.npy", "siglip2_features.npy", "derived_features.npy", "official_features.npy"],
+        },
+        "siglip2-base": {
+            "clip_model": "siglip2-base",
+            "clip_pretrained": "webli",
+            "manifest_names": ["siglip2_base_manifest.jsonl", "siglip2_manifest.jsonl", "siglip_manifest.jsonl", "derived_manifest.jsonl"],
+            "feature_names": ["siglip2_base_features.npy", "siglip2_features.npy", "siglip_features.npy", "derived_features.npy"],
+        },
+        "clip-l14": {
+            "clip_model": "ViT-L-14",
+            "clip_pretrained": "openai",
+            "manifest_names": ["clip_manifest.jsonl", "siglip2_manifest.jsonl", "siglip_manifest.jsonl", "derived_manifest.jsonl"],
+            "feature_names": ["clip_features.npy", "siglip2_features.npy", "siglip_features.npy", "derived_features.npy"],
+        },
+    }
+    
+    cfg = model_configs.get(model_choice, model_configs["siglip2"])
+
     # 1. Manifest
-    manifest_candidates = [
-        data_dir / "processed" / "siglip_manifest.jsonl",
-        data_dir / "processed" / "siglip2_manifest.jsonl",
-        data_dir / "processed" / "derived_manifest.jsonl",
-        data_dir / "processed" / "official_manifest.jsonl",
-    ]
+    manifest_candidates = [data_dir / "processed" / name for name in cfg["manifest_names"]]
     manifest = next((c for c in manifest_candidates if c.exists()), manifest_candidates[0])
 
     # 2. Features
-    feature_candidates = [
-        data_dir / "processed" / "siglip_features.npy",
-        data_dir / "processed" / "siglip2_features.npy",
-        data_dir / "processed" / "derived_features.npy",
-        data_dir / "processed" / "official_features.npy",
-    ]
+    feature_candidates = [data_dir / "processed" / name for name in cfg["feature_names"]]
     features = next((c for c in feature_candidates if c.exists()), feature_candidates[0])
 
     # 3. Dense ASR
@@ -139,19 +158,21 @@ def resolve_data_root_and_paths(base_str: str) -> dict[str, str]:
         "keyframes": str(keyframes),
         "videos": str(videos),
         "map_keyframes": str(map_keyframes),
+        "clip_model": cfg["clip_model"],
+        "clip_pretrained": cfg["clip_pretrained"],
     }
 
 
 # Initial default paths
-_INIT_PATHS = resolve_data_root_and_paths(DEFAULT_MASTER_ROOT)
+_INIT_PATHS = resolve_data_root_and_paths(DEFAULT_MASTER_ROOT, "siglip2")
 DEFAULT_MANIFEST = _INIT_PATHS["manifest"]
 DEFAULT_FEATURES = _INIT_PATHS["features"]
 DEFAULT_ROOT = _INIT_PATHS["keyframes"]
 DEFAULT_VIDEOS_ROOT = _INIT_PATHS["videos"]
 DEFAULT_MAP_KEYFRAMES = _INIT_PATHS["map_keyframes"]
 DEFAULT_ASR_FEATURES = _INIT_PATHS["asr_features"]
-DEFAULT_CLIP_MODEL = "siglip2" if "siglip2" in DEFAULT_FEATURES else "ViT-SO400M-14-SigLIP-384"
-DEFAULT_CLIP_PRETRAINED = "webli"
+DEFAULT_CLIP_MODEL = _INIT_PATHS["clip_model"]
+DEFAULT_CLIP_PRETRAINED = _INIT_PATHS["clip_pretrained"]
 
 
 st.set_page_config(page_title="PEGASUS AI Challenge 2026", layout="wide", page_icon="🦄")
@@ -1147,7 +1168,7 @@ st.markdown(
 # ===========================================================================
 st.markdown('<div class="topbar">', unsafe_allow_html=True)
 
-top_c1, top_c2 = st.columns([1.3, 3.1], gap="small")
+top_c1, top_c2, top_c3 = st.columns([1.1, 2.1, 1.8], gap="small")
 with top_c1:
     st.markdown('<div class="mini-label">🎯 Luồng bài toán</div>', unsafe_allow_html=True)
     query_type = st.segmented_control(
@@ -1163,13 +1184,28 @@ with top_c2:
         "Chế độ",
         ["hybrid", "siglip", "asr", "ocr"],
         format_func=lambda x: {
-            "hybrid": "🌈 Đa kênh (Hybrid)",
-            "siglip": "👁️ Thị giác (SigLIP)",
-            "asr": "🗣️ Lời thoại (ASR)",
-            "ocr": "🔤 Chữ màn hình (OCR)",
+            "hybrid": "🌈 Đa kênh",
+            "siglip": "👁️ Thị giác",
+            "asr": "🗣️ Lời thoại",
+            "ocr": "🔤 OCR",
         }.get(x, x),
         default="hybrid",
         key="search_mode",
+        label_visibility="collapsed",
+    )
+with top_c3:
+    st.markdown('<div class="mini-label">🤖 Mô hình Thị giác (Vision Model)</div>', unsafe_allow_html=True)
+    model_choice = st.selectbox(
+        "Mô hình",
+        ["siglip2", "siglip", "siglip2-base", "clip-l14"],
+        format_func=lambda x: {
+            "siglip2": "🚀 SigLIP 2 (SO400M - SOTA)",
+            "siglip": "👁️ SigLIP (SO400M - Chuẩn)",
+            "siglip2-base": "⚡ SigLIP 2 Base (ViT-B-16)",
+            "clip-l14": "🎨 OpenAI CLIP (ViT-L-14)",
+        }.get(x, x),
+        index=0,
+        key="selected_model_choice",
         label_visibility="collapsed",
     )
 
@@ -1246,7 +1282,7 @@ with tr_col:
     )
 
 # ---------------------------------------------------------------------------
-# Cấu hình 1-Click Master Root: Tự động ánh xạ toàn bộ đường dẫn con
+# Cấu hình 1-Click Master Root: Tự động ánh xạ toàn bộ đường dẫn con theo mô hình đã chọn
 # ---------------------------------------------------------------------------
 with st.expander("📂 Cấu hình Thư mục Dữ liệu Gốc (Chỉ cần điền 1 lần)", expanded=False):
     master_root_input = st.text_input(
@@ -1256,13 +1292,13 @@ with st.expander("📂 Cấu hình Thư mục Dữ liệu Gốc (Chỉ cần đi
         help="Ví dụ: D:\\bachkhoa\\ai_challenge hoặc D:\\bachkhoa\\ai_challenge\\data. Hệ thống sẽ tự động tìm thấy toàn bộ manifest, features, keyframes, videos, map-keyframes!",
     )
     
-    # Auto-resolve all paths from single root input
-    auto_paths = resolve_data_root_and_paths(master_root_input)
+    # Auto-resolve all paths from single root input and active model choice
+    auto_paths = resolve_data_root_and_paths(master_root_input, model_choice)
     
     col_p1, col_p2 = st.columns(2)
     with col_p1:
-        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["manifest"]).exists() else "🔴"} Manifest JSONL</span><span class="path-val" title="{auto_paths["manifest"]}">{auto_paths["manifest"]}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["features"]).exists() else "🔴"} SigLIP Features (.npy)</span><span class="path-val" title="{auto_paths["features"]}">{auto_paths["features"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["manifest"]).exists() else "🔴"} Manifest ({model_choice})</span><span class="path-val" title="{auto_paths["manifest"]}">{auto_paths["manifest"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["features"]).exists() else "🔴"} Features ({model_choice})</span><span class="path-val" title="{auto_paths["features"]}">{auto_paths["features"]}</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["asr_features"]).exists() else "⚪"} Dense ASR Features</span><span class="path-val" title="{auto_paths["asr_features"]}">{auto_paths["asr_features"]}</span></div>', unsafe_allow_html=True)
     with col_p2:
         st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["keyframes"]).exists() else "🔴"} Keyframes Dir</span><span class="path-val" title="{auto_paths["keyframes"]}">{auto_paths["keyframes"]}</span></div>', unsafe_allow_html=True)
@@ -1277,7 +1313,8 @@ with st.expander("📂 Cấu hình Thư mục Dữ liệu Gốc (Chỉ cần đi
         st.text_input("Root Keyframes", auto_paths["keyframes"], key="cfg_root")
         st.text_input("Root Videos (.mp4)", auto_paths["videos"], key="cfg_videos_root")
         st.text_input("Thư mục map-keyframes (.csv)", auto_paths["map_keyframes"], key="cfg_map_keyframes")
-        st.text_input("CLIP / SigLIP model", DEFAULT_CLIP_MODEL, key="cfg_clip_model")
+        st.text_input("CLIP / SigLIP model", auto_paths["clip_model"], key="cfg_clip_model")
+        st.text_input("CLIP / SigLIP pretrained", auto_paths["clip_pretrained"], key="cfg_clip_pretrained")
 
 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1288,6 +1325,8 @@ active_asr_features = st.session_state.get("cfg_asr_features") or auto_paths["as
 active_root = st.session_state.get("cfg_root") or auto_paths["keyframes"]
 active_videos_root = st.session_state.get("cfg_videos_root") or auto_paths["videos"]
 active_map_keyframes = st.session_state.get("cfg_map_keyframes") or auto_paths["map_keyframes"]
+active_clip_model = st.session_state.get("cfg_clip_model") or auto_paths["clip_model"]
+active_clip_pretrained = st.session_state.get("cfg_clip_pretrained") or auto_paths["clip_pretrained"]
 
 if st.session_state.get("_run_agent"):
     st.session_state["_run_agent"] = False
@@ -1302,8 +1341,8 @@ if st.session_state.get("_run_agent"):
                 runtime = {
                     "manifest_path": active_manifest,
                     "features_path": active_features,
-                    "clip_model": st.session_state.get("cfg_clip_model", DEFAULT_CLIP_MODEL),
-                    "clip_pretrained": st.session_state.get("cfg_clip", DEFAULT_CLIP_PRETRAINED),
+                    "clip_model": active_clip_model,
+                    "clip_pretrained": active_clip_pretrained,
                     "llm_model": st.session_state.get("cfg_llm", "qwen3.5:4b"),
                     "ollama_url": st.session_state.get("cfg_ollama", "http://127.0.0.1:11434"),
                     "metadata_filter": st.session_state.get("cfg_filter", ""),
@@ -1314,7 +1353,7 @@ if st.session_state.get("_run_agent"):
                 }
                 backend_url = st.session_state.get("cfg_backend", "http://127.0.0.1:8000")
 
-                with st.spinner("🔍 PEGASUS đang tìm kiếm frame..."):
+                with st.spinner(f"🔍 PEGASUS đang tìm kiếm frame với mô hình {model_choice}..."):
                     if query_type == "qa":
                         result = run_backend_qa_phase1(query, runtime, backend_url)
                     else:
