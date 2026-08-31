@@ -379,19 +379,13 @@ class RetrievalAgent:
             reverse=True,
         )
 
-        if query.type == "qa":
-            # Free the CLIP encoder (retrieval is done) so Florence-2 can load on
-            # low-RAM machines without OOM-ing on the combined ~1.2GB footprint.
+        if query.type == "qa" and getattr(self.tools, "vlm_model", None) and getattr(self.tools, "vlm_backend", "none") != "none":
             self.tools.close_text_encoder()
-            # Lazily build Florence-2 only now (after CLIP is freed) so the two
-            # heavy models are never resident at once. KIS/TRAKE have vlm_model
-            # None so this is a no-op there.
             self.tools.ensure_vlm()
             answers = self.tools.answer_question(
                 query.question or query.text,
                 candidates,
             )
-            # Release VLM weights now that answering is finished.
             self.tools.close_vlm()
 
             if answers:
@@ -399,10 +393,8 @@ class RetrievalAgent:
                     if item.vector_id is not None and item.vector_id in answers:
                         item.answer = answers[item.vector_id]
 
-            # Fallback for candidates missing an answer (e.g. VLM offline/failed/unavailable)
             for item in candidates:
                 if not item.answer:
-                    q_text = (query.question or query.text).strip()
                     item.answer = f"Visible in keyframe"
 
         # Deduplicate to keep the highest-scoring candidate for each (video_id, frame_id)

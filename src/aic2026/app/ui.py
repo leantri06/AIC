@@ -460,47 +460,7 @@ def run_backend(task_type: str, query: Query, runtime: dict, backend_url: str):
         raise BackendRequestError("Backend không trả về dữ liệu hợp lệ.") from exc
 
 
-def run_backend_qa_phase1(query: Query, runtime: dict, backend_url: str):
-    """Phase-1 QA: chỉ retrieval, không VLM. Trả candidates ngay để hiển gallery."""
-    from aic2026.agent.types import AgentResult
 
-    try:
-        response = httpx.post(
-            f"{backend_url.rstrip('/')}/tasks/qa/candidates",
-            json={
-                "query_id": query.query_id,
-                "text": query.text,
-                "question": query.question,
-                "events": query.events,
-                "runtime": runtime,
-            },
-            timeout=120,
-        )
-        response.raise_for_status()
-        return AgentResult.model_validate(response.json())
-    except httpx.TimeoutException as exc:
-        raise BackendRequestError("Retrieval quá thời gian (120s).") from exc
-    except httpx.HTTPStatusError as exc:
-        try:
-            detail = exc.response.json()
-        except json.JSONDecodeError:
-            detail = exc.response.text
-        raise BackendRequestError(f"Backend trả HTTP {exc.response.status_code}: {detail}") from exc
-    except httpx.RequestError:
-        try:
-            from aic2026.app.api import RuntimeConfig, TaskRequest, run_qa_candidates
-            task_req = TaskRequest(
-                query_id=query.query_id,
-                text=query.text,
-                question=query.question,
-                events=query.events,
-                runtime=RuntimeConfig(**runtime) if isinstance(runtime, dict) else runtime,
-            )
-            return run_qa_candidates(task_req)
-        except Exception as local_exc:
-            raise BackendRequestError(f"Lỗi khi chạy QA Phase 1 trực tiếp: {local_exc}") from local_exc
-    except (json.JSONDecodeError, ValidationError) as exc:
-        raise BackendRequestError("Backend không trả về dữ liệu hợp lệ.") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -1473,10 +1433,7 @@ if st.session_state.get("_run_agent"):
                 backend_url = st.session_state.get("cfg_backend", "http://127.0.0.1:8000")
 
                 with st.spinner(f"🔍 PEGASUS đang tìm kiếm frame với mô hình {model_choice}..."):
-                    if query_type == "qa":
-                        result = run_backend_qa_phase1(query, runtime, backend_url)
-                    else:
-                        result = run_backend(query_type, query, runtime, backend_url)
+                    result = run_backend(query_type, query, runtime, backend_url)
 
                 st.session_state.update(
                     query=query,
