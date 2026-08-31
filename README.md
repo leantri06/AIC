@@ -115,7 +115,18 @@ python -m aic2026.cli asr-manifest `
   --map-keyframes-dir "D:\ai_challenge\data\extracted\map-keyframes"
 ```
 
-### 3.3. Tiền trích xuất đặc trưng màu sắc (Tùy chọn)
+### 3.3. Mã hóa Ngữ nghĩa Lời thoại Dense Semantic ASR (BGE-M3 1024-dim)
+```powershell
+python -m aic2026.cli embed-asr `
+  --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl" `
+  --output "D:\ai_challenge\data\processed\asr_dense_features.npy" `
+  --model-name "BAAI/bge-m3" `
+  --device cuda `
+  --batch-size 128
+```
+*(Chỉ mất ~2-3 phút trên GPU RTX 4070 để mã hóa toàn bộ 177.321 keyframe, xuất ra file `asr_dense_features.npy` ~360 MB).*
+
+### 3.4. Tiền trích xuất đặc trưng màu sắc (Tùy chọn)
 ```powershell
 python -m aic2026.cli compute-colour-features `
   --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl" `
@@ -123,9 +134,9 @@ python -m aic2026.cli compute-colour-features `
   --output "D:\ai_challenge\data\processed\colour_features.jsonl"
 ```
 
-### 3.4. Kiểm tra tính đồng bộ của Index
+### 3.5. Kiểm tra tính đồng bộ của Index
 ```powershell
-python -m aic2026.cli check-features "D:\ai_challenge\data\processed\siglip2_features.npy" "D:\ai_challenge\data\processed\siglip2_manifest.jsonl"
+python -m aic2026.cli check-features "D:\ai_challenge\data\processed\siglip2_features.npy" --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl"
 ```
 
 ---

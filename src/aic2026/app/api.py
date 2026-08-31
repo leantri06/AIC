@@ -162,8 +162,33 @@ def load_orchestrator(
         backend=backend,
         chroma_dir=chroma_dir,
     )
+
+    # Auto-detect Dense Semantic ASR features (BGE-M3 1024-dim)
+    import numpy as np
+    asr_dense_file = None
+    for cand_asr in (
+        manifest_file.parent / "asr_dense_features.npy",
+        Path(r"D:\ai_challenge\data\processed\asr_dense_features.npy"),
+        Path("data/processed/asr_dense_features.npy"),
+    ):
+        if cand_asr.exists():
+            asr_dense_file = cand_asr
+            break
+
+    asr_features = None
+    if asr_dense_file is not None:
+        try:
+            asr_features = np.load(asr_dense_file)
+            logger.info("Loaded Dense ASR features %s from %s", asr_features.shape, asr_dense_file)
+        except Exception as exc:
+            logger.warning("Failed to load asr_dense_features from %s: %s", asr_dense_file, exc)
+
     pipeline = RetrievalPipeline(
-        index, manifest_records, frames_per_video=20, video_metadata=video_metadata
+        index,
+        manifest_records,
+        frames_per_video=20,
+        video_metadata=video_metadata,
+        asr_features=asr_features,
     )
     text_encoder = OpenCLIPTextEmbedder(model_name=clip_model, pretrained=clip_pretrained)
     tools = RetrievalTools(

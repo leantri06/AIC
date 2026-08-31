@@ -758,6 +758,84 @@ def asr_manifest(
     typer.echo(f"✅ Hoàn thành: {enriched:,}/{written:,} records đã được bổ sung ASR text vào {target}")
 
 
+@app.command("embed-asr")
+def embed_asr(
+    manifest: Path = typer.Option(Path("data/processed/siglip2_manifest.jsonl"), help="File manifest JSONL chứa asr_text"),
+    output: Path = typer.Option(Path("data/processed/asr_dense_features.npy"), help="File .npy đầu ra chứa ma trận embedding ASR (N, 1024)"),
+    model_name: str = typer.Option("BAAI/bge-m3", help="Mô hình Dense Text Embedder: BAAI/bge-m3"),
+    batch_size: int = typer.Option(128, min=1, help="Kích thước batch khi encode trên GPU"),
+    device: str = typer.Option("auto", help="Thiết bị: auto | cuda | cpu"),
+    dtype: str = typer.Option("float16", help="Kiểu dữ liệu lưu: float16 (nhẹ, ~360MB) | float32"),
+) -> None:
+    """Mã hóa ngữ nghĩa toàn bộ lời thoại ASR trong manifest thành vector dense 1024-dim (BGE-M3).
+
+    Tự động khử trùng lặp các câu thoại giống nhau để encode siêu tốc trên GPU (~2-3 phút),
+    sau đó ánh xạ ngược lại theo vector_id từng keyframe để tạo ma trận asr_dense_features.npy.
+    """
+    from aic2026.embeddings.asr import BGEM3TextEmbedder
+    from aic2026.ingestion import load_manifest
+    import numpy as np
+
+    manifest_path = manifest
+    if not manifest_path.exists():
+        for cand in (
+            Path(r"D:\ai_challenge\data\processed\siglip2_manifest.jsonl"),
+            Path("data/processed/siglip2_manifest.jsonl"),
+            Path(r"D:\ai_challenge\data\processed\derived_manifest.jsonl"),
+            Path("data/processed/derived_manifest.jsonl"),
+        ):
+            if cand.exists():
+                manifest_path = cand
+                break
+
+    typer.echo(f"[*] Đang đọc manifest từ {manifest_path}...")
+    records = load_manifest(manifest_path)
+    total_records = len(records)
+    typer.echo(f"[*] Tổng số keyframes: {total_records:,}")
+
+    # Gom các câu thoại ASR
+    texts_per_record: list[str] = []
+    unique_texts_set: set[str] = set()
+    for r in records:
+        asrs = getattr(r, "asr_text", []) or []
+        joined = " ".join(asrs).strip()
+        texts_per_record.append(joined)
+        if joined:
+            unique_texts_set.add(joined)
+
+    unique_texts = sorted(list(unique_texts_set))
+    typer.echo(f"[*] Số keyframe có lời thoại ASR: {sum(1 for t in texts_per_record if t):,}")
+    typer.echo(f"[*] Số câu thoại duy nhất cần mã hóa: {len(unique_texts):,}")
+
+    if not unique_texts:
+        typer.echo("⚠️ Cảnh báo: Không tìm thấy nội dung ASR nào trong manifest. Hãy chạy `asr-manifest` trước!")
+        raise typer.Exit(code=1)
+
+    typer.echo(f"[*] Đang nạp mô hình {model_name} trên thiết bị {device}...")
+    embedder = BGEM3TextEmbedder(model_name=model_name, device=device)
+
+    typer.echo(f"[*] Bắt đầu mã hóa {len(unique_texts):,} câu thoại (batch_size={batch_size})...")
+    unique_embeddings = embedder.encode(unique_texts, batch_size=batch_size, normalize=True)
+    dim = unique_embeddings.shape[1]
+    typer.echo(f"[*] Đã mã hóa xong! Kích thước vector: {dim}-dim")
+
+    # Map ngược lại toàn bộ 177k keyframe
+    typer.echo(f"[*] Đang dựng ma trận đặc trưng ASR toàn bộ {total_records:,} keyframes...")
+    text_to_idx = {t: i for i, t in enumerate(unique_texts)}
+
+    save_dtype = np.float16 if dtype == "float16" else np.float32
+    features_matrix = np.zeros((total_records, dim), dtype=save_dtype)
+
+    for i, t in enumerate(texts_per_record):
+        if t and t in text_to_idx:
+            features_matrix[i] = unique_embeddings[text_to_idx[t]].astype(save_dtype)
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    np.save(output, features_matrix)
+    file_size_mb = output.stat().st_size / (1024 * 1024)
+    typer.echo(f"✅ HOÀN THÀNH: Đã lưu {features_matrix.shape} ({file_size_mb:.2f} MB) tại {output}")
+
+
 @app.command("agent-query")
 def agent_query(
     query: Path = typer.Option(..., help="JSON file matching the Query schema"),
@@ -817,11 +895,33 @@ def agent_query(
     )
 
     index = load_index_for_query(resolved_features, manifest_records, backend=backend, chroma_dir=chroma_dir)
+
+    # Auto-detect Dense Semantic ASR features
+    asr_dense_file = None
+    for cand_asr in (
+        resolved_manifest.parent / "asr_dense_features.npy",
+        Path(r"D:\ai_challenge\data\processed\asr_dense_features.npy"),
+        Path("data/processed/asr_dense_features.npy"),
+    ):
+        if cand_asr.exists():
+            asr_dense_file = cand_asr
+            break
+
+    asr_features = None
+    if asr_dense_file is not None:
+        try:
+            import numpy as np
+            asr_features = np.load(asr_dense_file)
+            typer.echo(f"[*] Auto-loaded Dense Semantic ASR features: {asr_features.shape} from {asr_dense_file}")
+        except Exception as exc:
+            typer.echo(f"⚠️ Không load được asr_dense_features: {exc}")
+
     pipeline = RetrievalPipeline(
         index,
         manifest_records,
         frames_per_video=20,
         video_metadata=video_metadata,
+        asr_features=asr_features,
     )
     text_encoder = OpenCLIPTextEmbedder(model_name=clip_model, pretrained=clip_pretrained)
     encode_text = text_encoder.encode

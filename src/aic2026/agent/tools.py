@@ -64,6 +64,7 @@ class RetrievalTools:
     vlm_judge_top_k: int = 15
     vlm_judge_weight: float = 0.5
     vlm_judge_obj: Any | None = None
+    asr_embedder_obj: Any | None = None
     encode_images: Callable[[list[object]], np.ndarray] | None = None
     bm25_index: BM25Index | None = None
     # Trọng số metadata bonus (Direction B): nhỏ, cộng trực tiếp lên RRF gốc
@@ -206,6 +207,9 @@ class RetrievalTools:
             w_vis = modality.w_vis if modality else 0.6
             w_ocr = modality.w_ocr if modality else 0.2
             w_asr = modality.w_asr if modality else 0.2
+
+            if w_asr > 0 and self.pipeline.asr_features is not None:
+                self.ensure_asr_embedder()
 
             # Pass multi-facet embeddings for SRRF visual fusion when available
             vis_emb_input = embeddings if len(embeddings) > 1 else embeddings[0]
@@ -638,6 +642,29 @@ class RetrievalTools:
                 self.vlm_judge_obj.close()
             except Exception as exc:
                 logger.warning("close_vlm_judge: failed to close: %s", exc)
+
+    def ensure_asr_embedder(self) -> Any | None:
+        """Lazily initialize the Dense ASR embedder (BGE-M3) if ASR features are loaded."""
+        if self.asr_embedder_obj is not None:
+            return self.asr_embedder_obj
+        if self.pipeline.asr_features is None:
+            return None
+        try:
+            from aic2026.embeddings.asr import BGEM3TextEmbedder
+            self.asr_embedder_obj = BGEM3TextEmbedder()
+            self.pipeline.encode_asr = self.asr_embedder_obj.encode
+            return self.asr_embedder_obj
+        except Exception as exc:
+            logger.warning("ensure_asr_embedder: failed to load BGEM3TextEmbedder: %s", exc)
+            return None
+
+    def close_asr_embedder(self) -> None:
+        """Free ASR embedder GPU memory."""
+        if self.asr_embedder_obj is not None and hasattr(self.asr_embedder_obj, "unload"):
+            try:
+                self.asr_embedder_obj.unload()
+            except Exception as exc:
+                logger.warning("close_asr_embedder: failed: %s", exc)
 
     def rerank_with_vlm_judge(
         self,

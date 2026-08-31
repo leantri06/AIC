@@ -47,6 +47,8 @@ class RetrievalPipeline:
         manifest: list[FrameRecord],
         frames_per_video: int = 3,
         video_metadata: VideoMetadataStore | None = None,
+        asr_features: np.ndarray | None = None,
+        encode_asr: Any | None = None,
     ) -> None:
         if len(index.vectors) != len(manifest):
             raise ValueError("Feature count must equal manifest record count")
@@ -57,6 +59,8 @@ class RetrievalPipeline:
         self.index = index
         self.manifest = manifest
         self.frames_per_video = frames_per_video
+        self.asr_features = asr_features
+        self.encode_asr = encode_asr
         # Per-video metadata (title/description/keywords) lives outside the
         # manifest now to avoid 200x duplication. When provided, metadata
         # filters and BM25 tokenization consult it instead of scanning every
@@ -963,15 +967,42 @@ class RetrievalPipeline:
                     manifest_idx = int(idx)
                     fused_scores[manifest_idx] = fused_scores.get(manifest_idx, 0.0) + wo * (float(sc) + 1.0 / (60 + rank + 1))
 
-        # 3. ASR branch
-        if wa > 0 and not bm25_index.is_empty:
+        # 3. ASR branch (Hybrid Dense-Sparse Speech Retrieval)
+        if wa > 0:
             q_asr = asr_query.strip() if asr_query.strip() else visual_query
-            a_ids, a_scores = bm25_index.search_asr(q_asr, top_frames)
-            if a_ids.size > 0:
-                a_norm = _norm(a_scores)
-                for rank, (idx, sc) in enumerate(zip(a_ids, a_norm)):
-                    manifest_idx = int(idx)
-                    fused_scores[manifest_idx] = fused_scores.get(manifest_idx, 0.0) + wa * (float(sc) + 1.0 / (60 + rank + 1))
+            asr_branch_scores: dict[int, float] = {}
+
+            # 3a. Dense Semantic ASR Search (BGE-M3 1024-dim)
+            if self.asr_features is not None and self.encode_asr is not None and q_asr:
+                try:
+                    q_asr_vec = self.encode_asr([q_asr])[0]
+                    sims = np.dot(self.asr_features, q_asr_vec)
+                    if video_ids:
+                        for idx, record in enumerate(self.manifest):
+                            if record.video_id not in video_ids:
+                                sims[idx] = -1.0
+                    k_fetch = min(top_frames, len(sims))
+                    top_dense_indices = np.argpartition(-sims, k_fetch - 1)[:k_fetch]
+                    top_dense_indices = top_dense_indices[np.argsort(-sims[top_dense_indices])]
+                    for r, idx in enumerate(top_dense_indices):
+                        s_val = float(sims[idx])
+                        if s_val > 0.05:
+                            asr_branch_scores[int(idx)] = asr_branch_scores.get(int(idx), 0.0) + 0.65 * (s_val + 1.0 / (60 + r + 1))
+                except Exception as asr_err:
+                    logger.warning("Dense ASR retrieval error: %s", asr_err)
+
+            # 3b. Sparse Lexical ASR Search (BM25)
+            if not bm25_index.is_empty and q_asr:
+                a_ids, a_scores = bm25_index.search_asr(q_asr, top_frames)
+                if a_ids.size > 0:
+                    a_norm = _norm(a_scores)
+                    for rank, (idx, sc) in enumerate(zip(a_ids, a_norm)):
+                        manifest_idx = int(idx)
+                        asr_branch_scores[manifest_idx] = asr_branch_scores.get(manifest_idx, 0.0) + 0.35 * (float(sc) + 1.0 / (60 + rank + 1))
+
+            # Blend into total fused scores
+            for manifest_idx, a_sc in asr_branch_scores.items():
+                fused_scores[manifest_idx] = fused_scores.get(manifest_idx, 0.0) + wa * a_sc
 
         # Fallback if no modalities returned results
         if not fused_scores:

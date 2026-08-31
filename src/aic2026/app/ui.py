@@ -83,6 +83,10 @@ DEFAULT_MAP_KEYFRAMES = _detect_default_path([
     "data/extracted/map-keyframes",
     "data/raw/map-keyframes",
 ])
+DEFAULT_ASR_FEATURES = _detect_default_path([
+    r"D:\ai_challenge\data\processed\asr_dense_features.npy",
+    "data/processed/asr_dense_features.npy",
+])
 DEFAULT_CLIP_MODEL = "siglip2" if "siglip2" in DEFAULT_FEATURES else "ViT-SO400M-14-SigLIP-384"
 DEFAULT_CLIP_PRETRAINED = "webli"
 
@@ -1264,6 +1268,7 @@ with st.expander("Cấu hình nâng cao"):
     st.text_input("Backend API", "http://127.0.0.1:8000", key="cfg_backend")
     st.text_input("Manifest", DEFAULT_MANIFEST, key="cfg_manifest")
     st.text_input("Feature .npy", DEFAULT_FEATURES, key="cfg_features")
+    st.text_input("Dense ASR Feature .npy (BGE-M3)", DEFAULT_ASR_FEATURES, key="cfg_asr_features", help="Ma trận vector ngữ nghĩa lời thoại 1024-dim sinh bởi `aic2026 embed-asr`")
     st.text_input("Root keyframe", DEFAULT_ROOT, key="cfg_root")
     st.text_input("CLIP / SigLIP model", DEFAULT_CLIP_MODEL, key="cfg_clip_model", help="SigLIP 2: ViT-SO400M-14-SigLIP2-378 (siglip2), ViT-B-16-SigLIP2-384 (siglip2-base) | SigLIP 1: ViT-SO400M-14-SigLIP-384 (siglip) | CLIP: ViT-L-14")
     st.text_input("CLIP pretrained", DEFAULT_CLIP_PRETRAINED, key="cfg_clip", help="openai, metaclip_fullcc, metaclip_400m, laion2b_s32b_b82k, webli")

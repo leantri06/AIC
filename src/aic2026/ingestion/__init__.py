@@ -15,9 +15,11 @@ LOCAL_SIGLIP_FEATURES = Path(r"D:\ai_challenge\data\processed\siglip_features.np
 
 LOCAL_DERIVED_MANIFEST = Path(r"D:\ai_challenge\data\processed\derived_manifest.jsonl")
 LOCAL_DERIVED_FEATURES = Path(r"D:\ai_challenge\data\processed\derived_features.npy")
+LOCAL_ASR_DENSE_FEATURES = Path(r"D:\ai_challenge\data\processed\asr_dense_features.npy")
 
 SIGLIP_MANIFEST = Path("data/processed/siglip_manifest.jsonl")
 SIGLIP_FEATURES = Path("data/processed/siglip_features.npy")
+ASR_DENSE_FEATURES = Path("data/processed/asr_dense_features.npy")
 
 OFFICIAL_MANIFEST = Path("data/processed/official_manifest.jsonl")
 OFFICIAL_FEATURES = Path("data/processed/official_features.npy")
