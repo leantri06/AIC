@@ -77,7 +77,7 @@ class OllamaLLM:
         self,
         model: str,
         base_url: str = "http://127.0.0.1:11434",
-        timeout_seconds: float = 600,
+        timeout_seconds: float = 5.0,
         temperature: float = 0.0,
         num_predict: int = 1500,
         num_ctx: int = 8192,

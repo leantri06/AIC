@@ -66,7 +66,12 @@ class OpenCLIPTextEmbedder:
         self.pretrained = resolved_pre
         self.torch = torch
         self.use_ensemble = use_ensemble
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        if device:
+            self.device = device
+        else:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        if str(self.device).lower().startswith("cuda") and not torch.cuda.is_available():
+            self.device = "cpu"
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(
             self.model_name, pretrained=self.pretrained, device=self.device
         )
@@ -146,6 +151,8 @@ class OpenCLIPTextEmbedder:
 
         self.torch = torch
         self.device = self.device or ("cuda" if torch.cuda.is_available() else "cpu")
+        if str(self.device).lower().startswith("cuda") and not torch.cuda.is_available():
+            self.device = "cpu"
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(
             self.model_name, pretrained=self.pretrained, device=self.device
         )

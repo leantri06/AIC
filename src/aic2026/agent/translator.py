@@ -175,10 +175,12 @@ _VN_EN_TOKENS: dict[str, str] = {
     "vu cong": "dancer", "khan gia": "audience spectators", "trong tai": "referee",
     "cau thu": "football soccer player", "van dong vien": "athlete",
     # Động vật
-    "voi": "elephant", "cho": "dog", "meo": "cat", "trau": "buffalo",
+    "con voi": "elephant", "cho": "dog", "meo": "cat", "trau": "buffalo",
     "ngua": "horse", "ho": "tiger", "khi": "monkey", "chim": "bird",
     "ca": "fish", "bo": "cow", "de": "goat", "lon": "pig", "heo": "pig",
     "ga": "chicken", "vit": "duck", "ran": "snake", "ca sau": "crocodile",
+    # Từ nối / Quan hệ
+    "voi": "with", "va": "and", "cung": "with together", "cac": "the", "nhung": "the",
     # Hành động / Hoạt động
     "noi": "speak", "noi chuyen": "talk", "phong van": "interview",
     "thuyet trinh": "giving presentation", "phat bieu": "giving speech",
@@ -278,6 +280,19 @@ _VN_EN_TOKENS: dict[str, str] = {
 
 # Cụm truy vấn thường gặp phải được dịch theo cả nghĩa, không ghép từng từ.
 _FIXED_PHRASES: list[tuple[str, str]] = [
+    ("che bien mon an", "cooking a dish in a pan"),
+    ("che bien", "cooking preparing food"),
+    ("mon an", "dish food"),
+    ("trong chao", "in a frying pan"),
+    ("cho bong he vao chao", "adding green chives into the frying pan"),
+    ("cho vao chao", "putting adding into the pan"),
+    ("cho vao", "putting adding into"),
+    ("doi truong", "pork chitterlings"),
+    ("mieng doi truong", "pieces of pork chitterlings"),
+    ("bong he", "green chives"),
+    ("rau xanh", "green vegetables"),
+    ("dau bep", "chef cook"),
+    ("mot dau bep", "a chef"),
     ("not nguoi", "a person"),
     ("dia da ngan", "multi-compartment plate"),
     ("dia nhieu ngan", "multi-compartment plate"),

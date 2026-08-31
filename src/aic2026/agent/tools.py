@@ -651,7 +651,7 @@ class RetrievalTools:
             return None
         try:
             from aic2026.embeddings.asr import BGEM3TextEmbedder
-            self.asr_embedder_obj = BGEM3TextEmbedder()
+            self.asr_embedder_obj = BGEM3TextEmbedder(device="cpu")
             self.pipeline.encode_asr = self.asr_embedder_obj.encode
             return self.asr_embedder_obj
         except Exception as exc:

@@ -120,14 +120,14 @@ class RetrievalAgent:
         from .translator import decompose_query_modalities, formulate_visual_facets, translate_query_fields
 
         if self.translate:
-            use_llm = self.llm is not None
+            use_llm = False
             translated_text, translated_question, translated_events, translated_changed, translation_source = (
                 translate_query_fields(
                     query.text,
                     query.question,
                     query.events,
-                    self.llm,
-                    use_llm=use_llm,
+                    None,
+                    use_llm=False,
                 )
             )
             if translated_changed:
@@ -182,8 +182,8 @@ class RetrievalAgent:
         if self.translate and query.type != "trake":
             visual_facets = formulate_visual_facets(
                 retrieval_text,
-                llm=self.llm,
-                use_llm=self.llm is not None,
+                llm=None,
+                use_llm=False,
             )
         else:
             visual_facets = None
@@ -193,8 +193,8 @@ class RetrievalAgent:
         # Modality routing & decomposition (Visual / OCR / ASR) — AAAI 2026
         modality_plan = decompose_query_modalities(
             retrieval_text,
-            llm=self.llm,
-            use_llm=self.translate and self.llm is not None,
+            llm=None,
+            use_llm=False,
         )
         if visual_facets and visual_facets.q_core:
             modality_plan.visual_query = visual_facets.q_core

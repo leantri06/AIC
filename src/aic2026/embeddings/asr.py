@@ -47,9 +47,7 @@ class BGEM3TextEmbedder:
             logger.warning("BGEM3TextEmbedder: transformers/torch not installed: %s", exc)
             return
 
-        resolved_device = self.device
-        if not resolved_device or resolved_device == "auto":
-            resolved_device = "cuda" if torch.cuda.is_available() else "cpu"
+        resolved_device = self.device or "cpu"
 
         try:
             logger.info("BGEM3TextEmbedder: Loading %s on %s...", self.model_name, resolved_device)
@@ -57,7 +55,7 @@ class BGEM3TextEmbedder:
             self._model = AutoModel.from_pretrained(
                 self.model_name,
                 low_cpu_mem_usage=True,
-                torch_dtype=torch.float16 if resolved_device == "cuda" else torch.float32,
+                dtype=torch.float32,
             )
             self._model.to(resolved_device)
             self._model.eval()

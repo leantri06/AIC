@@ -93,7 +93,7 @@ class RuntimeConfig(BaseModel):
 
 class TaskRequest(BaseModel):
     query_id: str = "live-query"
-    text: str = Field(min_length=1)
+    text: str = ""
     question: str | None = None
     events: list[str] = Field(default_factory=list)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
