@@ -14,6 +14,8 @@ set "OMP_NUM_THREADS=1"
 set "MKL_NUM_THREADS=1"
 set "OPENBLAS_NUM_THREADS=1"
 set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
+set "HF_HUB_OFFLINE=1"
+set "TRANSFORMERS_OFFLINE=1"
 if exist "D:\bachkhoa\ai_challenge\data" (
     set "HF_HOME=D:\bachkhoa\ai_challenge\data\.cache\huggingface"
 ) else (

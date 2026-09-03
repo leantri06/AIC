@@ -15,6 +15,8 @@ os.environ["STREAMLIT_SERVER_ENABLE_WEBSOCKET_COMPRESSION"] = "false"
 os.environ["STREAMLIT_SERVER_ENABLE_CORS"] = "false"
 os.environ["STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION"] = "false"
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 if os.path.exists(r"D:\bachkhoa\ai_challenge\data"):
     os.environ.setdefault("HF_HOME", r"D:\bachkhoa\ai_challenge\data\.cache\huggingface")
 elif os.path.exists(r"D:\ai_challenge\data"):
@@ -514,69 +516,66 @@ def build_query(query_type: str, text: str, question: str, events_text: str) -> 
     )
 
 
-@st.cache_data(show_spinner=False)
-def load_keyframe_lookup(manifest_path: str) -> dict[tuple[str, int], str]:
-    records = load_manifest(Path(manifest_path))
-    return {(record.video_id, record.frame_id): record.keyframe_path for record in records}
-
-
-@st.cache_data(show_spinner=False)
-def load_asr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
-    try:
-        records = load_manifest(Path(manifest_path))
-        return {
-            (record.video_id, record.frame_id): record.asr_text
-            for record in records
-            if getattr(record, "asr_text", None)
-        }
-    except Exception:
-        return {}
-
-
-@st.cache_data(show_spinner=False)
-def load_video_asr_timeline(manifest_path: str, video_id: str) -> list[tuple[int, list[str]]]:
-    try:
-        records = load_manifest(Path(manifest_path))
-        timeline = []
-        for r in records:
-            if r.video_id == video_id and getattr(r, "asr_text", None):
-                timeline.append((r.frame_id, r.asr_text))
-        timeline.sort(key=lambda x: x[0])
-        return timeline
-    except Exception:
-        return []
-
-
-@st.cache_data(show_spinner=False)
-def load_ocr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
-    try:
-        records = load_manifest(Path(manifest_path))
-        return {
-            (record.video_id, record.frame_id): record.object_labels
-            for record in records
-            if getattr(record, "object_labels", None)
-        }
-    except Exception:
-        return {}
-
-
-@st.cache_data(show_spinner=False)
-def load_video_keyframes(manifest_path: str | None) -> dict[str, list[int]]:
-    by_video: dict[str, list[int]] = defaultdict(list)
+@st.cache_resource(show_spinner=False, max_entries=1)
+def load_all_manifest_tables(manifest_path: str | None):
     if not manifest_path or not Path(manifest_path).exists():
-        return {}
-    try:
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                rec = json.loads(line)
-                by_video[rec["video_id"]].append(int(rec["frame_id"]))
-        for vid in by_video:
-            by_video[vid] = sorted(set(by_video[vid]))
-    except Exception:
-        pass
-    return dict(by_video)
+        return {}, {}, {}, {}, {}
+
+    keyframe_lookup: dict[tuple[str, int], str] = {}
+    asr_lookup: dict[tuple[str, int], list[str]] = {}
+    ocr_lookup: dict[tuple[str, int], list[str]] = {}
+    by_video: dict[str, list[int]] = defaultdict(list)
+    timelines: dict[str, list[tuple[int, list[str]]]] = defaultdict(list)
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            vid = rec.get("video_id")
+            fid = int(rec.get("frame_id", 0))
+            if not vid:
+                continue
+            pair = (vid, fid)
+            kf_path = rec.get("keyframe_path")
+            if kf_path:
+                keyframe_lookup[pair] = kf_path
+            by_video[vid].append(fid)
+            asr = rec.get("asr_text")
+            if asr:
+                asr_lookup[pair] = asr
+                timelines[vid].append((fid, asr))
+            ocr = rec.get("object_labels")
+            if ocr:
+                ocr_lookup[pair] = ocr
+
+    for vid in by_video:
+        by_video[vid] = sorted(set(by_video[vid]))
+    for vid in timelines:
+        timelines[vid].sort(key=lambda x: x[0])
+
+    return keyframe_lookup, asr_lookup, ocr_lookup, dict(by_video), dict(timelines)
+
+
+def load_keyframe_lookup(manifest_path: str) -> dict[tuple[str, int], str]:
+    return load_all_manifest_tables(manifest_path)[0]
+
+
+def load_asr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
+    return load_all_manifest_tables(manifest_path)[1]
+
+
+def load_ocr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
+    return load_all_manifest_tables(manifest_path)[2]
+
+
+def load_video_keyframes(manifest_path: str | None) -> dict[str, list[int]]:
+    return load_all_manifest_tables(manifest_path)[3]
+
+
+def load_video_asr_timeline(manifest_path: str, video_id: str) -> list[tuple[int, list[str]]]:
+    timelines = load_all_manifest_tables(manifest_path)[4]
+    return timelines.get(video_id, [])
 
 
 def resolve_keyframe_path(stored_path: str, root: Path) -> Path:

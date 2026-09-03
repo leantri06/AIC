@@ -204,7 +204,7 @@ def load_orchestrator(
     # metadata is deliberately excluded: it is near-duplicate across frames and
     # adds memory/IDF noise without improving frame selection.
     from aic2026.retrieval import BM25Index
-    tools.bm25_index = BM25Index(manifest_records)
+    tools.bm25_index = BM25Index.get_or_create(manifest_file, manifest_records)
     # Pass the VLM model id to tools; it is built lazily ONLY on the QA answer
     # step (after the CLIP encoder is freed) so CLIP + Florence are never both
     # resident (avoids OOM). For KIS/TRAKE we force "none" so the VLM is never

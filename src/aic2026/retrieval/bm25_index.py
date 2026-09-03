@@ -225,6 +225,19 @@ class BM25Index:
         res = self._search_engine(self._bm25_asr, query, k)
         return res if len(res[0]) > 0 else self.search(query, k)
 
+    def save(self, path: str | Path) -> None:
+        """Serialize BM25Index to disk for fast subsequent loading."""
+        import pickle
+        with open(path, "wb") as f:
+            pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    @classmethod
+    def load(cls, path: str | Path) -> BM25Index:
+        """Load precomputed BM25Index directly from disk."""
+        import pickle
+        with open(path, "rb") as f:
+            return pickle.load(f)
+
     @classmethod
     def from_manifest(
         cls,
@@ -233,4 +246,29 @@ class BM25Index:
     ) -> BM25Index:
         """Convenience constructor; mirrors VectorIndex.from_npy naming style."""
         return cls(manifest, video_metadata=video_metadata)
+
+    @classmethod
+    def get_or_create(
+        cls,
+        manifest_path: str | Path,
+        manifest: list[FrameRecord] | None = None,
+        video_metadata: "VideoMetadataStore | None" = None,
+    ) -> BM25Index:
+        """Load cached BM25Index from disk if available, else build and cache it."""
+        from pathlib import Path
+        cache_path = Path(manifest_path).with_suffix(".bm25.pkl")
+        if cache_path.exists():
+            try:
+                return cls.load(cache_path)
+            except Exception:
+                pass
+        if manifest is None:
+            from aic2026.models import load_manifest
+            manifest = load_manifest(Path(manifest_path))
+        index = cls(manifest, video_metadata=video_metadata)
+        try:
+            index.save(cache_path)
+        except Exception:
+            pass
+        return index
 

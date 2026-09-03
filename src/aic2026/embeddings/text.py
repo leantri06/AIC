@@ -75,7 +75,12 @@ class OpenCLIPTextEmbedder:
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(
             self.model_name, pretrained=self.pretrained, device=self.device
         )
-        self.tokenizer = open_clip.get_tokenizer(self.model_name)
+        # Purge massive vision transformer (saves ~3.5GB RAM on CPU, prevents disk paging)
+        if hasattr(self.model, "visual"):
+            del self.model.visual
+        import gc
+        gc.collect()
+        self.tokenizer = self._get_tokenizer_safe(self.model_name)
         self.model.eval()
 
     def encode(
@@ -156,5 +161,47 @@ class OpenCLIPTextEmbedder:
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(
             self.model_name, pretrained=self.pretrained, device=self.device
         )
-        self.tokenizer = open_clip.get_tokenizer(self.model_name)
+        if hasattr(self.model, "visual"):
+            del self.model.visual
+        import gc
+        gc.collect()
+        self.tokenizer = self._get_tokenizer_safe(self.model_name)
         self.model.eval()
+
+    @staticmethod
+    def _get_tokenizer_safe(model_name: str):
+        import open_clip
+        try:
+            return open_clip.get_tokenizer(model_name)
+        except Exception:
+            pass
+
+        # Offline fallback for HuggingFace cached tokenizer
+        from pathlib import Path
+        import os
+        from transformers import AutoTokenizer
+        clean = model_name.replace("/", "--")
+        roots = [
+            Path(os.environ.get("HF_HOME", "")) / "hub",
+            Path(r"D:\bachkhoa\ai_challenge\data\.cache\huggingface\hub"),
+            Path(r"D:\ai_challenge\data\.cache\huggingface\hub"),
+        ]
+        for r in roots:
+            if not r.exists():
+                continue
+            for candidate in r.glob(f"*{clean}*"):
+                snapshots = candidate / "snapshots"
+                if snapshots.exists():
+                    for snap in snapshots.glob("*"):
+                        if (snap / "tokenizer.json").exists():
+                            try:
+                                hf_tok = AutoTokenizer.from_pretrained(snap, local_files_only=True)
+                                def _tok(texts, context_length=64):
+                                    if isinstance(texts, str):
+                                        texts = [texts]
+                                    res = hf_tok(list(texts), padding="max_length", max_length=context_length, truncation=True, return_tensors="pt")
+                                    return res["input_ids"]
+                                return _tok
+                            except Exception:
+                                pass
+        return open_clip.get_tokenizer(model_name)
