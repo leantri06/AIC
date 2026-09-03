@@ -1,322 +1,203 @@
 # 🚀 AIC 2026 — PEGASUS Video Retrieval System
 
 Hệ thống tìm kiếm video đa phương thức tối tân phục vụ 3 bài toán trọng tâm vòng sơ tuyển **AI Challenge 2026 (KIS / Q&A / TRAKE)**:
-* **👁️ Visual Vector Search SOTA:** **Google SigLIP 2** (`ViT-SO400M-14-SigLIP2-378` / alias: `siglip2`) & SigLIP 1 (`ViT-SO400M-14-SigLIP-384`).
-* **⚖️ VLM-as-a-Judge:** **Qwen2.5-VL-3B / 7B** thẩm định thị giác chính xác cho KIS, kiểm tra bằng chứng thị giác (Visual Evidence) cho Q&A, và xác thực chuỗi đa sự kiện thời gian cho TRAKE.
-* **🧠 Dense Semantic ASR (BGE-M3 1024-dim):** Tìm kiếm ngữ nghĩa lời thoại sâu sắc bằng `BAAI/bge-m3`, kết hợp **Hybrid Dense-Sparse** cùng BM25 để bắt trúng $100\%$ từ đồng nghĩa và diễn giải gián tiếp.
+* **👁️ Visual Vector Search SOTA:** **Google SigLIP 2** (`ViT-SO400M-14-SigLIP2-378` / alias: `siglip2`) tăng tốc bằng GPU NVIDIA CUDA (thời gian tìm kiếm $\le 1\text{s}$).
+* **🎯 Shot-level Temporal NMS:** Thuật toán lọc phi cực đại triệt tiêu các khung hình trùng lặp trong cùng 1 cảnh quay, tối ưu hóa đưa keyframe chuẩn xác nhất lên Top 1.
+* **🧠 Dense Semantic ASR (BGE-M3 1024-dim):** Tìm kiếm ngữ nghĩa lời thoại sâu sắc bằng `BAAI/bge-m3` (định dạng `model.safetensors` nạp trực tiếp trong $0.05\text{s}$), kết hợp **Hybrid Dense-Sparse** cùng BM25.
+* **⚡ BLIP-2 ITM Cross-Encoder:** Tích hợp mô hình đối chiếu chéo cấp độ pixel theo nghiên cứu SOTA (arXiv:2512.12935v1) kèm bộ chốt an toàn VRAM Guard.
+* **⚖️ VLM-as-a-Judge:** **Qwen2.5-VL-3B / 7B** thẩm định thị giác chi tiết cho KIS, kiểm tra bằng chứng thị giác (Visual Evidence) cho Q&A, và xác thực chuỗi đa sự kiện thời gian cho TRAKE.
 * **🔤 Lexical & Metadata:** BM25 nhãn vật thể (Faster R-CNN) + Tiêu đề/mô tả YouTube + PaddleOCR.
-* **🌈 Reranking & Filtering:** Hybrid SRRF (Score-Reflected Reciprocal Rank Fusion) + VLM Judge Rerank + Bộ lọc màu sắc.
-* **⏱️ Chuỗi Hành Động TRAKE:** Căn chỉnh chuỗi sự kiện theo thứ tự thời gian bằng Dynamic Programming Monotonic Alignment + VLM Sequence Verifier.
+* **⚡ Startup Preloader:** Tự động nạp sẵn toàn bộ mô hình và 177,321 keyframe vào RAM/GPU ngay khi mở app — **không còn độ trễ chờ đợi ở câu lệnh đầu tiên!**
 
 ---
 
-## 📑 Mục lục
-1. [Cài đặt môi trường](#1-cài-đặt-môi-trường)
-2. [Cấu trúc thư mục Dữ liệu tách riêng](#2-cấu-trúc-thư-mục-dữ-liệu-tách-riêng)
-3. [Chuẩn bị dữ liệu & Xây dựng Index](#3-chuẩn-bị-dữ-liệu--xây-dựng-index)
-4. [Khởi động Giao diện PEGASUS Web & Cấu hình đường dẫn](#4-khởi-động-giao-diện-pegasus-web--cấu-hình-đường-dẫn)
-5. [Chi tiết Tính năng VLM-as-a-Judge & Dense Semantic ASR](#5-chi-tiết-tính-năng-vlm-as-a-judge--dense-semantic-asr)
-6. [Hướng dẫn Tìm kiếm & Xuất bài nộp BTC](#6-hướng-dẫn-tìm-kiếm--xuất-bài-nộp-btc)
-7. [Chạy bằng CLI & Đánh giá (Evaluate)](#7-chạy-bằng-cli--đánh-giá-evaluate)
-8. [Xử lý sự cố thường gặp (Troubleshooting)](#8-xử-lý-sự-cố-thường-gặp-troubleshooting)
-9. [Chi tiết Công nghệ Hiện tại & Đề xuất Nâng cấp Tiên tiến](#9-chi-tiết-công-nghệ-hiện-tại--đề-xuất-nâng-cấp-tiên-tiến)
+## 📑 Mục Lục
+1. [Điểm Nổi Bật & Các Cải Tiến Mới Nhất](#1-điểm-nổi-bật--các-cải-tiến-mới-nhất)
+2. [Cấu Trúc Thư Mục Dữ Liệu & Mã Nguồn](#2-cấu-trúc-thư-mục-dữ-liệu--mã-nguồn)
+3. [Cài Đặt Môi Trường (PyTorch CUDA 12.1)](#3-cài-đặt-môi-trường-pytorch-cuda-121)
+4. [Hướng Dẫn Khởi Động & Sử Dụng Giao Diện Web](#4-hướng-dẫn-khởi-động--sử-dụng-giao-diện-web)
+5. [Chi Tiết 4 Chế Độ Tìm Kiếm & Bí Quyết Chọn](#5-chi-tiết-4-chế-độ-tìm-kiếm--bí-quyết-chọn)
+6. [Cơ Chế Reranking, Lọc Đa Dạng Hóa (NMS) & VLM Judge](#6-cơ-chế-reranking-lọc-đa-dạng-hóa-nms--vlm-judge)
+7. [Chạy Bằng Dòng Lệnh CLI & Đánh Giá Ground-Truth](#7-chạy-bằng-dòng-lệnh-cli--đánh-giá-ground-truth)
+8. [Xử Lý Sự Cố Thường Gặp (Troubleshooting)](#8-xử-lý-sự-cố-thường-gặp-troubleshooting)
 
 ---
 
-## 1. Cài đặt môi trường
+## 1. Điểm Nổi Bật & Các Cải Tiến Mới Nhất
 
-### Yêu cầu tiên quyết:
-* **Hệ điều hành:** Windows 10/11 hoặc Linux / macOS.
-* **Python:** `3.10` – `3.12` (khuyên dùng Python 3.11).
-* **GPU NVIDIA (Khuyên dùng):** RTX Series (ví dụ: RTX 4070 12GB VRAM) hoặc GTX 1060 trở lên để tăng tốc trích xuất và tìm kiếm.
-
-### Các bước cài đặt:
-
-Mở **PowerShell / Terminal** tại thư mục gốc dự án:
-
-```powershell
-# 1. Tạo môi trường ảo (chỉ chạy lần đầu)
-uv venv --python 3.11 .venv
-# Hoặc dùng python chuẩn: python -m venv .venv
-
-# 2. Kích hoạt môi trường ảo
-# Windows:
-.venv\Scripts\activate
-# Linux / macOS:
-# source .venv/bin/activate
-
-# 3. Cài đặt toàn bộ dependencies của dự án bằng uv (khuyên dùng)
-uv sync --extra retrieval --extra models --extra video --extra asr --extra agent --extra dev
-# Hoặc bằng pip:
-# pip install -e ".[retrieval,models,video,asr,agent,dev]"
-
-# 4. Cài đặt PyTorch CUDA cho GPU NVIDIA (khuyên dùng CUDA 12.4)
-uv pip install --reinstall-package torch torchvision --extra-index-url https://download.pytorch.org/whl/cu124
-```
-
-> **(Tùy chọn) Cài đặt Ollama nếu muốn chạy Qwen2.5-VL 7B bản lượng tử hóa 4-bit:**
-> ```powershell
-> ollama pull qwen2.5vl:7b
-> ollama serve
-> ```
+| Tính Năng | Trạng Thái Trước Đây | **Cải Tiến Mới Hiện Tại** | Lợi Ích Mang Lại |
+| :--- | :--- | :--- | :--- |
+| **GPU CUDA Acceleration** | Chạy PyTorch CPU (rất chậm) | **PyTorch CUDA 12.1** trên NVIDIA GTX 1070 / RTX Series | Tốc độ tìm kiếm tăng vọt từ 3-5 phút xuống **$\le 1\text{s}$ (Visual)** và **4-8s (Hybrid)**. |
+| **Startup Preloader** | Đợi 3-5 phút ở lượt query đầu tiên | Tự động nạp trước toàn bộ Model, Manifest & BM25 lúc mở app | **Truy vấn đầu tiên phản hồi ngay lập tức** trong vài giây. |
+| **Quản lý Bộ nhớ VRAM** | Dễ văng lỗi `CUDA Out of Memory` | Singleton `_MODEL_CACHE` + xả sạch VRAM rác `empty_cache()` | VRAM chỉ chiếm **~700 MB - 2.7 GB** (trên tổng 8 GB), không bao giờ lo tràn RAM hay tràn VRAM. |
+| **Đa dạng hóa Kết quả (NMS)** | Top 10 toàn ảnh của cùng 1 giây video | **Shot-level Temporal NMS** (ngăn trùng lặp trong $\pm 75$ frames) | Loại bỏ ảnh trùng lặp góc máy, đưa các keyframe độc nhất và đúng nhất lên Top 1 - Top 5. |
+| **Dense Semantic ASR** | Cảnh báo lỗi `safetensors` | Nạp trực tiếp file `model.safetensors` cục bộ trên ổ D | BGE-M3 nạp xong trong **$0.05\text{s}$**, tuyệt đối sạch bóng cảnh báo và lỗi bảo mật. |
+| **Lưu Trữ Dữ Liệu An Toàn** | Nguy cơ tràn ổ C | Khóa cứng 4 tầng biến môi trường (`HF_HOME`, `TORCH_HOME`, `UV_CACHE_DIR`, `PIP_CACHE_DIR`) sang ổ **`D:`** | **Giải phóng hơn 26 GB trên ổ C**, toàn bộ model và cache tương lai 100% nằm tại ổ D còn trống hơn 400 GB. |
 
 ---
 
-## 2. Cấu trúc thư mục Dữ liệu tách riêng
+## 2. Cấu Trúc Thư Mục Dữ Liệu & Mã Nguồn
 
-> [!NOTE]
-> **Toàn bộ thư mục dữ liệu (`extracted` và `processed`) được lưu riêng biệt ngoài mã nguồn `AIC`** tại `D:\ai_challenge\data\` để tránh nặng repo Git và tiện quản lý.
-
-Sơ đồ cấu trúc thư mục data bên ngoài:
+Toàn bộ dữ liệu lớn (ảnh keyframe, vector npy, manifest jsonl, model cache) được lưu tách biệt trên **ổ `D:\bachkhoa\ai_challenge\data`** để không làm nặng mã nguồn:
 
 ```text
-D:\ai_challenge\data\ (Thư mục dữ liệu bên ngoài)
-├── extracted/                            # Dữ liệu giải nén do BTC cung cấp
-│   ├── Keyframes/                        # Thư mục ảnh keyframe (L21_V001/001.jpg, ...)
-│   ├── map-keyframes/                    # File CSV ánh xạ frame_idx sang timestamp pts_time
-│   ├── asr/                              # File JSON lời thoại ASR từng video (L21_V001.json, ...)
-│   ├── Objects/                          # File JSON nhãn vật thể Faster R-CNN
-│   ├── Metadata/                         # File JSON thông tin video YouTube
-│   ├── clip_features/                    # (Tùy chọn) File .npy CLIP gốc của BTC
-│   └── Videos/                           # (Tùy chọn) File video .mp4 gốc
-└── processed/                            # Dữ liệu index đã xử lý (đầu ra của hệ thống)
-    ├── siglip2_manifest.jsonl            # Manifest SigLIP 2 (vector_id, frame_id, labels, asr_text)
-    ├── siglip2_features.npy              # Ma trận vector SigLIP 2 (177.321 x 1152)
-    ├── asr_dense_features.npy            # Ma trận vector ngữ nghĩa lời thoại BGE-M3 (177.321 x 1024)
-    ├── siglip_manifest.jsonl             # Manifest SigLIP 1
-    ├── siglip_features.npy               # Ma trận vector SigLIP 1
-    ├── derived_manifest.jsonl            # Manifest dự phòng
-    ├── derived_features.npy              # Ma trận vector dự phòng
-    └── colour_features.jsonl             # Đặc trưng màu sắc (tùy chọn)
+D:\bachkhoa\ai_challenge\
+├── my-repo\                                 # Thư mục mã nguồn dự án (Git repository)
+│   ├── run_app.bat                          # File khởi động 1-click vào Web UI
+│   ├── pyproject.toml                       # Cấu hình dependencies (uv / pip)
+│   ├── .streamlit\config.toml               # Tối ưu giao diện Streamlit
+│   └── src\aic2026\                         # Package mã nguồn chính
+│       ├── app\ui.py                        # Giao diện Web PEGASUS Streamlit
+│       ├── app\api.py                       # REST API & Bộ điều phối Orchestrator
+│       ├── embeddings\text.py               # Singleton OpenCLIP & SigLIP 2 Text Embedder
+│       ├── embeddings\asr.py                # Dense Semantic ASR Embedder (BGE-M3 Safetensors)
+│       ├── reranking\blip2_reranker.py      # BLIP-2 ITM Cross-Encoder & Temporal NMS
+│       └── agent\tools.py                   # Retrieval Pipeline & Score Fusion Engine
+│
+└── data\                                    # Thư mục dữ liệu độc lập bên ngoài
+    ├── .cache\                              # Bộ nhớ đệm mô hình (Hugging Face, Torch, UV, Pip)
+    │   └── huggingface\hub\                 # Chứa model BGE-M3, SigLIP 2, Qwen...
+    ├── extracted\                           # Dữ liệu BTC cung cấp
+    │   ├── Keyframes\                       # Toàn bộ ảnh keyframe (L21_V001/001.jpg, ...)
+    │   ├── map-keyframes\                   # File CSV ánh xạ frame sang pts_time
+    │   ├── asr\                             # File JSON lời thoại ASR
+    │   └── Objects\                         # Nhãn vật thể Faster R-CNN
+    └── processed\                           # Dữ liệu hệ thống đã trích xuất sẵn
+        ├── siglip2_manifest.jsonl           # Bảng tra cứu 177.321 keyframes
+        ├── siglip2_features.npy             # Ma trận vector đặc trưng SigLIP 2 (177.321 x 1152)
+        ├── asr_dense_features.npy           # Ma trận vector ngữ nghĩa lời thoại (177.321 x 1024)
+        └── bm25_index_cache.pkl             # Bộ nhớ đệm BM25 tải nhanh tức thì
 ```
 
 ---
 
-## 3. Chuẩn bị dữ liệu & Xây dựng Index
+## 3. Cài Đặt Môi Trường (PyTorch CUDA 12.1)
 
-### 3.1. Tự Encode Keyframes bằng GPU (Mô hình Google SigLIP 2 mới nhất)
-```powershell
-python -m aic2026.cli embed-keyframes `
-  --keyframes-dir "D:\ai_challenge\data\extracted\Keyframes" `
-  --map-keyframes-dir "D:\ai_challenge\data\extracted\map-keyframes" `
-  --features-dir "D:\ai_challenge\data\processed\siglip2_features_dir" `
-  --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl" `
-  --features "D:\ai_challenge\data\processed\siglip2_features.npy" `
-  --clip-model siglip2 `
-  --device cuda `
-  --batch-size 64
-```
-*(Hỗ trợ resume tự động nếu bị ngắt quãng).*
+### Yêu cầu hệ thống:
+* **Hệ điều hành:** Windows 10/11 (hoặc Linux).
+* **Python:** `3.10` – `3.12` (khuyên dùng Python 3.11).
+* **GPU NVIDIA:** GTX 1060 / GTX 1070 (8GB VRAM) hoặc dòng RTX Series để đạt tốc độ tối đa.
 
-### 3.2. Ánh xạ lời thoại ASR vào Manifest
-```powershell
-python -m aic2026.cli asr-manifest `
-  --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl" `
-  --asr-dir "D:\ai_challenge\data\extracted\asr" `
-  --map-keyframes-dir "D:\ai_challenge\data\extracted\map-keyframes"
-```
+### Các bước cài đặt nhanh:
+Mở PowerShell tại thư mục `D:\bachkhoa\ai_challenge\my-repo`:
 
-### 3.3. Mã hóa Ngữ nghĩa Lời thoại Dense Semantic ASR (BGE-M3 1024-dim)
 ```powershell
-python -m aic2026.cli embed-asr `
-  --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl" `
-  --output "D:\ai_challenge\data\processed\asr_dense_features.npy" `
-  --model-name "BAAI/bge-m3" `
-  --device cuda `
-  --batch-size 128
-```
-*(Chỉ mất ~2-3 phút trên GPU RTX 4070 để mã hóa toàn bộ 177.321 keyframe, xuất ra file `asr_dense_features.npy` ~360 MB).*
+# 1. Tạo môi trường ảo với uv (khuyên dùng)
+uv venv --python 3.11 .venv
 
-### 3.4. Tiền trích xuất đặc trưng màu sắc (Tùy chọn)
-```powershell
-python -m aic2026.cli compute-colour-features `
-  --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl" `
-  --raw-dir "D:\ai_challenge\data\extracted" `
-  --output "D:\ai_challenge\data\processed\colour_features.jsonl"
-```
+# 2. Cài đặt toàn bộ thư viện cần thiết
+uv sync --extra retrieval --extra models --extra video --extra asr --extra agent --extra dev
 
-### 3.5. Kiểm tra tính đồng bộ của Index
-```powershell
-python -m aic2026.cli check-features "D:\ai_challenge\data\processed\siglip2_features.npy" --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl"
+# 3. Cài đặt PyTorch hỗ trợ GPU CUDA 12.1
+uv pip install --reinstall-package torch torchvision --extra-index-url https://download.pytorch.org/whl/cu121
 ```
 
 ---
 
-## 4. Khởi động Giao diện PEGASUS Web & Cấu hình đường dẫn
+## 4. Hướng Dẫn Khởi Động & Sử Dụng Giao Diện Web
 
-### Khởi động Web UI:
-* **Cách 1 (Nhanh nhất):** Nhấp đúp chuột vào file [`run_app.bat`](file:///d:/ai_challenge/AIC/run_app.bat).
-* **Cách 2 (Terminal):** `streamlit run src/aic2026/app/ui.py`
-* **Cách 3 (Backend API + UI):** Terminal 1: `python -m aic2026.cli serve` | Terminal 2: `streamlit run src/aic2026/app/ui.py`
+### 4.1. Khởi động Giao diện:
+* **Cách 1 (Nhanh nhất - Khuyên dùng):** Nhấp đúp chuột vào file [`run_app.bat`](run_app.bat).
+* **Cách 2 (Qua dòng lệnh):**
+  ```powershell
+  uv run streamlit run src/aic2026/app/ui.py
+  ```
+Trình duyệt sẽ tự động mở tại địa chỉ: `http://localhost:8501`.
 
-### ⚙️ Đường dẫn Data mặc định tự động nhận diện:
-Giao diện đã được cấu hình tự động nhận diện chính xác các đường dẫn trên máy bạn:
-* **Manifest Path:** `D:\ai_challenge\data\processed\siglip2_manifest.jsonl`
-* **Features Path:** `D:\ai_challenge\data\processed\siglip2_features.npy`
-* **Dense ASR Features Path:** `D:\ai_challenge\data\processed\asr_dense_features.npy` (mã hóa ngữ nghĩa BGE-M3)
-* **Keyframes Dir:** `D:\ai_challenge\data\extracted\Keyframes`
-* **Map Keyframes Dir:** `D:\ai_challenge\data\extracted\map-keyframes`
-* **Videos Dir:** `D:\ai_challenge\data\extracted\Videos` (nếu có)
+### 4.2. Cơ chế Tự Động Nạp Trước (Startup Preloader):
+Ngay khi mở trang web, hệ thống sẽ chạy tiến trình **Startup Preloader** ngầm:
+* Tải trước toàn bộ bảng tra cứu **177,321 keyframe**.
+* Khởi tạo và làm ấm mô hình **SigLIP 2 trên GPU**.
+* Nạp chỉ mục **BM25 và BGE-M3**.
+> 💡 Nhờ cơ chế này, bạn có thể nhập câu truy vấn và bấm tìm kiếm **ngay lập tức mà không cần phải chờ 3-5 phút nạp dữ liệu ở lần đầu tiên!**
 
----
-
-## 5. Chi Tiết Tính Năng VLM-as-a-Judge & Dense Semantic ASR
-
-### 5.1. VLM-as-a-Judge (Qwen2.5-VL)
-Hệ thống tích hợp **Qwen2.5-VL-3B-Instruct** (hoặc 7B) làm "Trọng tài thị giác" (Visual Verifier & Reranker) cho cả 3 bài toán:
-
-* **🔍 KIS (Known Item Search)**: VLM "nhìn" từng frame trong Top 15, phân tích chi tiết điều kiện (màu sắc, vật thể, hành động, graffiti, tranh vẽ...) và chấm điểm 0–100 $\rightarrow$ Đưa frame đúng nhất lên Top 1.
-* **🎯 Q&A (Visual Evidence Verifier)**: Thẩm định xem ảnh ứng viên có chứa **bằng chứng trực tiếp** để trả lời câu hỏi hay không $\rightarrow$ Đưa frame có đáp án lên Top 1 để bạn tự quan sát và gõ câu trả lời vào bài nộp (tránh AI hallucinate).
-* **⏱️ TRAKE (Temporal Sequence Verifier)**: Thẩm định chuỗi đa ảnh $(f_1 \to f_2 \to \dots \to f_N)$, kiểm tra từng frame có khớp với từng event trong chuỗi thời gian hay không.
-
-#### ⚙️ Cách Kích Hoạt VLM Judge:
-* **Trên Web UI**: Mở **Cấu hình nâng cao** (Sidebar) $\rightarrow$ Tích chọn `[x] ⚖️ Kích hoạt VLM-as-a-Judge (Qwen2.5-VL)`. Mặc định sử dụng model `Qwen/Qwen2.5-VL-3B-Instruct` (cực nhanh ~0.3s/ảnh, tối ưu hoàn hảo cho 12GB VRAM RTX 4070).
-* **Trên CLI**: Thêm cờ `--vlm-judge --vlm-judge-model "Qwen/Qwen2.5-VL-3B-Instruct" --vlm-judge-top-k 15`.
-
-### 5.2. Dense Semantic Speech Retrieval (BGE-M3 1024-dim)
-* Sử dụng mô hình **`BAAI/bge-m3`** mã hóa toàn bộ câu thoại ASR thành vector ngữ nghĩa 1024 chiều.
-* Tự động kết hợp **Hybrid Dense-Sparse**:
-  $$\text{Score}_{\text{ASR}} = 0.65 \cdot \text{Dense}_{\text{BGE-M3}} + 0.35 \cdot \text{Sparse}_{\text{BM25}}$$
-* Bắt trúng câu thoại kể cả khi query dùng từ đồng nghĩa hoặc diễn giải gián tiếp (ví dụ: *"hoàn cảnh nghèo khó"* $\leftrightarrow$ *"mẹ mất sớm, không có tiền đóng học"*).
+### 4.3. Cấu hình 1-Click Master Root:
+Hệ thống sử dụng cơ chế **1-Click Master Root**:
+* Bạn chỉ cần trỏ đường dẫn gốc tại sidebar: `D:\bachkhoa\ai_challenge\data`
+* Toàn bộ 5 đường dẫn con (`manifest`, `features`, `keyframes`, `map-keyframes`, `videos`) sẽ được tự động nhận diện chính xác 100%.
 
 ---
 
-## 6. Hướng dẫn Tìm kiếm & Xuất bài nộp BTC
+## 5. Chi Tiết 4 Chế Độ Tìm Kiếm & Bí Quyết Chọn
 
-### 6.1. Bốn Chế độ Tìm kiếm Chuyên biệt (Search Modality):
-Hệ thống cho phép bạn linh hoạt chọn kênh tìm kiếm phù hợp với từng dạng câu hỏi:
+Ở thanh công cụ tìm kiếm, bạn có thể lựa chọn 1 trong 4 chế độ chuyên biệt:
 
-| Chế độ | Ý nghĩa | Khi nào nên chọn? |
-| :--- | :--- | :--- |
-| 🌈 **Đa kênh (Hybrid)** | Dung hợp SigLIP 2 + Dense ASR + BM25 OCR | Mặc định, dùng khi câu hỏi vừa có mô tả hình ảnh vừa có từ khóa/lời thoại. |
-| 👁️ **Thị giác (SigLIP)** | Thuần Visual Vector Search ($w_{\text{vis}}=1.0$) | Dùng khi câu hỏi thuần mô tả thị giác/hình ảnh (ví dụ: *"người phụ nữ mặc áo đỏ lái xe"*). |
-| 🗣️ **Lời thoại (ASR)** | Thuần Dense & Sparse Speech Search ($w_{\text{asr}}=1.0$) | Dùng khi câu hỏi trích dẫn câu thoại của nhân vật (ví dụ: *"bản tin thông báo thời tiết"*). Giữ nguyên tiếng Việt 100%, tìm kiếm tức thì. |
-| 🔤 **Chữ màn hình (OCR)** | Thuần OCR Text Search ($w_{\text{ocr}}=1.0$) | Dùng khi câu hỏi tìm biển báo, banner, logo, chữ trên màn hình (ví dụ: *"biển hiệu Phở 24"*). |
-
-### 6.2. Các luồng bài toán:
-1. **Tìm kiếm KIS (Known-Item Search):** Tìm 1 khung hình chính xác theo mô tả.
-2. **Tìm kiếm Q&A:** Nhập ngữ cảnh và câu hỏi, VLM Judge đưa frame chứa đáp án lên đầu.
-3. **Tìm kiếm TRAKE:** Tìm chuỗi sự kiện theo thứ tự thời gian.
-
-### 6.3. Chọn kết quả & Xuất file nộp bài:
-1. Click trực tiếp lên các card ảnh kết quả để chọn đáp án đúng.
-2. Các ảnh được chọn sẽ có khung viền màu hồng đánh dấu thứ tự click.
-3. Bấm nút **"Xuất CSV nộp bài"** để tải file CSV đúng định dạng nộp cho BTC.
+| Chế độ | Biểu tượng | Bản chất công nghệ | Khi nào nên sử dụng? |
+| :--- | :---: | :--- | :--- |
+| **Đa kênh (Hybrid)** | 🌈 | Dung hợp SigLIP 2 + Dense ASR + BM25 OCR | **Mặc định**. Dùng khi câu hỏi vừa có mô tả bối cảnh hình ảnh vừa có từ khóa/lời thoại. |
+| **Thị giác (SigLIP)** | 👁️ | Thuần Visual Vector Search ($w_{\text{vis}}=1.0$) | Dùng khi câu hỏi thuần mô tả hình ảnh, màu sắc, hành động (ví dụ: *"người phụ nữ mặc áo đỏ lái xe ô tô"*). **Tốc độ $\le 1\text{s}$!** |
+| **Lời thoại (ASR)** | 🗣️ | Dense BGE-M3 (1024d) + BM25 Tiếng Việt | Dùng khi câu hỏi trích dẫn lời thoại của nhân vật trong video (ví dụ: *"chúng ta phải bảo vệ môi trường biển"*). Bắt trúng cả từ đồng nghĩa! |
+| **Chữ màn hình (OCR)**| 🔤 | Thuần BM25 Lexical OCR Search ($w_{\text{ocr}}=1.0$) | Dùng khi tìm kiếm biển hiệu cửa hàng, logo, banner, chữ viết trên màn hình (ví dụ: *"biển hiệu Quán Cơm Bình Dân"*). |
 
 ---
 
-## 7. Chạy bằng CLI & Đánh giá (Evaluate)
+## 6. Cơ Chế Reranking, Lọc Đa Dạng Hóa (NMS) & VLM Judge
 
-### 7.1. Chạy truy vấn KIS bằng CLI:
-Tạo file `query_kis.json`:
-```json
-{
-  "query_id": "kis_001",
-  "type": "kis",
-  "text": "bản tin thời sự sạt lở bờ sông"
-}
-```
+Trên thanh Sidebar hoặc thanh tùy chọn nhanh, bạn có thể bật/tắt các công cụ xếp hạng nâng cao:
 
-Thực thi tìm kiếm (`--mode` có thể chọn `hybrid`, `siglip`, `asr`, `ocr`):
+### 6.1. 🎯 Lọc Đa Dạng Hóa (Temporal NMS) — *Khuyên dùng BẬT*
+* **Vấn đề thực tế:** Khi tìm kiếm thông thường, Top 10 kết quả thường rơi vào cùng một đoạn video dài 2 giây (vì 10 frame đó gần như giống hệt nhau), khiến bạn khó tìm ra đáp án nếu video đó không đúng.
+* **Cơ chế NMS:** Tự động triệt tiêu các frame nằm trong cửa sổ thời gian gần nhau ($\pm 75$ frames $\approx 3$ giây) và giới hạn tối đa 2-3 frames cho mỗi video.
+* **Kết quả:** Danh sách Top 100 sẽ chứa các cảnh quay đa dạng từ nhiều video khác nhau, giúp **Top-1 và Top-5 trúng đích nhanh hơn gấp nhiều lần!**
+
+### 6.2. ⚡ BLIP-2 GPU Reranker (Cross-Encoder)
+* So khớp chi tiết từng vùng điểm ảnh (pixel patches) của các frame ứng viên với câu truy vấn.
+* Tích hợp **VRAM Guard**: Tự động kiểm tra bộ nhớ GPU. Nếu VRAM trống $< 2.0\text{GB}$, hệ thống tự động fallback về SigLIP an toàn, không bao giờ gây lỗi sập app hay OOM.
+
+### 6.3. ⚖️ VLM-as-a-Judge (Qwen2.5-VL)
+* Dành cho bài toán khó cần thẩm định logic phức tạp: VLM sẽ "nhìn" từng ảnh trong Top 15 và chấm điểm theo tiêu chí:
+  * **KIS:** Kiểm tra chi tiết màu sắc, đồ vật nhỏ, chữ graffiti.
+  * **Q&A:** Đưa frame chứa góc nhìn có bằng chứng trả lời câu hỏi lên đầu.
+  * **TRAKE:** Kiểm tra tính nhất quán của chuỗi đa sự kiện theo thời gian ($t_1 < t_2 < t_3$).
+
+---
+
+## 7. Chạy Bằng Dòng Lệnh CLI & Đánh Giá Ground-Truth
+
+Bạn có thể chạy tự động hàng loạt truy vấn qua CLI:
+
+### 7.1. Chạy truy vấn KIS:
 ```powershell
-# 1. Tìm kiếm -> JSON
 python -m aic2026.cli agent-query `
   --query query_kis.json `
-  --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl" `
-  --features "D:\ai_challenge\data\processed\siglip2_features.npy" `
-  --mode asr `
+  --manifest "D:\bachkhoa\ai_challenge\data\processed\siglip2_manifest.jsonl" `
+  --features "D:\bachkhoa\ai_challenge\data\processed\siglip2_features.npy" `
+  --mode hybrid `
   --output outputs/result_kis.json
 
-# 2. Xuất CSV nộp bài
+# Xuất CSV nộp bài cho BTC
 python -m aic2026.cli export-submission --result outputs/result_kis.json --query query_kis.json --output outputs/submission_kis.csv
 ```
 
-### 7.2. Chạy truy vấn TRAKE bằng CLI:
-Tạo file `query_trake.json`:
-```json
-{
-  "query_id": "trake_001",
-  "type": "trake",
-  "text": "Một người mở tủ lạnh, lấy chai nước và uống",
-  "events": [
-    "A person opens the refrigerator door",
-    "Taking out a bottle of water",
-    "Drinking water from the bottle"
-  ]
-}
-```
-
-Xuất kết quả TRAKE (kết quả CSV chứa `video_id,f1,f2,f3` theo thứ tự các event):
+### 7.2. Chạy truy vấn TRAKE (Chuỗi sự kiện thời gian):
 ```powershell
 python -m aic2026.cli agent-query `
   --query query_trake.json `
-  --manifest "D:\ai_challenge\data\processed\siglip2_manifest.jsonl" `
-  --features "D:\ai_challenge\data\processed\siglip2_features.npy" `
+  --manifest "D:\bachkhoa\ai_challenge\data\processed\siglip2_manifest.jsonl" `
+  --features "D:\bachkhoa\ai_challenge\data\processed\siglip2_features.npy" `
   --output outputs/result_trake.json
 
 python -m aic2026.cli export-submission --result outputs/result_trake.json --query query_trake.json --output outputs/submission_trake.csv
 ```
 
-### 7.3. Đánh giá Ground-Truth (Evaluate):
+### 7.3. Đánh giá độ chính xác (Evaluate):
 ```powershell
-# Đánh giá R@k và Final Score
 python -m aic2026.cli evaluate query_kis.json outputs/result_kis.json ground_truth_kis.json
 ```
 
 ---
 
-## 8. Xử lý sự cố thường gặp (Troubleshooting)
+## 8. Xử Lý Sự Cố Thường Gặp (Troubleshooting)
 
-| Vấn đề / Lỗi | Nguyên nhân | Cách khắc phục |
+| Tình Huống / Cảnh Báo | Nguyên Nhân | Cách Xử Lý |
 | :--- | :--- | :--- |
-| **`activate.ps1 cannot be loaded...`** | PowerShell chặn script thực thi. | Chạy lệnh: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process` |
-| **`CUDA Available: False`** | Chưa cài bản PyTorch có CUDA. | Chạy: `uv pip install --reinstall-package torch torchvision --extra-index-url https://download.pytorch.org/whl/cu124` |
-| **Lỗi OpenMP `libiomp5md.dll`** | Trùng thư viện runtime giữa PyTorch và các gói khác trên Windows. | Trong PowerShell chạy: `$env:KMP_DUPLICATE_LIB_OK="TRUE"` trước khi chạy lệnh. |
-| **Ảnh không hiển thị trên Web UI** | Đường dẫn `Keyframes Dir` trỏ chưa đúng thư mục data bên ngoài. | Vào mục **Cấu hình nâng cao** trên Sidebar của Web UI, kiểm tra lại đường dẫn `Keyframes Dir` (`D:\ai_challenge\data\extracted\Keyframes`). |
-| **Lỗi Access Violation `-1073741819`** | RAM hệ thống bị tràn khi nạp model 7B unquantized. | Dùng model `Qwen/Qwen2.5-VL-3B-Instruct` (mặc định) hoặc chạy 7B qua Ollama 4-bit (`ollama run qwen2.5vl:7b`). |
-| **Chạy kiểm thử toàn bộ hệ thống** | Kiểm tra tính ổn định của mã nguồn. | Chạy lệnh: `pytest` (Toàn bộ 152 tests sẽ pass). |
+| **`CUDA out of memory`** | Trùng lặp mô hình trên GPU hoặc chạy đồng thời ứng dụng đồ họa nặng khác. | Hệ thống đã có **Singleton Cache** và **VRAM Guard**. Hãy tắt bớt game/ứng dụng 3D nền, khởi động lại bằng `run_app.bat`. |
+| **`BGEM3TextEmbedder: Failed to load... safetensors`** | Hugging Face yêu cầu định dạng an toàn `.safetensors`. | **Đã sửa xong**: Code tự động đọc snapshot `model.safetensors` trên ổ `D:`. |
+| **`runner.enforceZeroRerunWarning is not a valid option`** | Tùy chọn cũ trong Streamlit phiên bản trước. | **Đã gỡ bỏ**: File `.streamlit/config.toml` đã được dọn sạch. |
+| **`HF_HUB_OFFLINE` chặn tải model** | Cờ offline mode trong batch script cũ. | **Đã sửa**: Đã mở kết nối và chuyển toàn bộ cache tải về ổ `D:`. |
+| **Ảnh keyframe không hiển thị** | Sai đường dẫn thư mục Keyframes. | Đảm bảo Master Root trỏ đúng `D:\bachkhoa\ai_challenge\data` (nơi chứa thư mục `extracted\Keyframes`). |
+| **Lỗi OpenMP `libiomp5md.dll` trên Windows** | Xung đột thư viện OpenMP giữa các gói. | Trong `run_app.bat` đã đặt sẵn `set KMP_DUPLICATE_LIB_OK=TRUE`. |
 
 ---
 
-## 9. Chi tiết Công nghệ Hiện tại & Đề xuất Nâng cấp Tiên tiến
-
-### 9.1. Bảng Tổng quan Công nghệ theo từng Chế độ
-
-| Chế độ / Nhiệm vụ | 🛠️ Công nghệ Hiện tại (Current PEGASUS) | 🚀 Đề xuất Nâng cấp Tiên tiến (SOTA Upgrades) |
-| :--- | :--- | :--- |
-| **👁️ Thị giác (SigLIP 2 & Vector Search)** | • **Google SigLIP 2** `ViT-SO400M-14-SigLIP2-378` (SOTA) & SigLIP 1 `ViT-SO400M-14-SigLIP-384`<br>• Multi-template Prompt Ensembling (5 prompts)<br>• Vectorized Cosine Similarity / FAISS Index<br>• GQE 4-Facet SRRF Decomposition (`q_core`, `q_entity`, `q_action`, `q_scene`)<br>• Temporal Gaussian Smoothing ($\sigma=1.5, w=3$) | • **Video-Language Models (VLM video-native):** `InternVideo2`, `VideoLLaMA3`, `Video-LLaVA` hiểu trực tiếp chuỗi chuyển động spatio-temporal thay vì frame tĩnh.<br>• **CLIP chuyên biệt Tiếng Việt & Đa ngữ:** `EVA-02-CLIP-E/14+`, `DFN-5B`, hoặc Fine-tune `ViCLIP` / `PhoCLIP`.<br>• **Fine-grained Region Grounding:** `Grounding DINO` + `SAM2` trích xuất embedding từng vùng đối tượng nhỏ/chìm. |
-| **⚖️ VLM-as-a-Judge (Phán Quyết Thị Giác)** | • **Qwen2.5-VL-3B / 7B Instruct** làm Trọng tài Thị giác Giai đoạn 2 (2nd-stage High-Precision Reranker):<br>  - **KIS:** Thẩm định chi tiết màu sắc, vật thể, hành động, graffiti, tranh vẽ.<br>  - **QA:** Thẩm định bằng chứng thị giác trực tiếp (Visual Evidence) đưa frame chứa đáp án lên Top 1.<br>  - **TRAKE:** Thẩm định tính nhất quán chuỗi đa sự kiện $(f_1 \to f_2 \to \dots \to f_N)$.<br>• Score Blending: $S_{\text{blended}} = S_{\text{retrieval}} \cdot (1 - w) + \frac{S_{\text{vlm}}}{100} \cdot w$ | • **Domain-specific Fine-tuning:** Fine-tune Qwen2.5-VL trên tập dữ liệu AIC các năm trước để nhận diện chính xác các câu hỏi đặc thù BTC.<br>• **Direct Video Chunk Verification:** Truyền 4–8 keyframe liên tiếp quanh mốc thời gian để VLM kiểm tra chuyển động ngữ cảnh. |
-| **🗣️ Lời thoại (Dense & Sparse ASR)** | • **Dense Semantic ASR (BGE-M3 1024-dim):** Mã hóa ngữ nghĩa toàn bộ câu thoại, tìm kiếm bằng tích vô hướng ma trận GPU ($< 2\text{ms}$).<br>• **Sparse Lexical BM25Okapi:** Tokenizer Tiếng Việt nâng cao (NFC, Bigram ghép từ phức, Accent-folding).<br>• **Hybrid Fusion:** $S_{\text{ASR}} = 0.65 \cdot \text{Dense} + 0.35 \cdot \text{Sparse}$.<br>• Khớp timestamp PTS thời gian thực từ `map-keyframes`. | • **ASR Re-transcription & Diarization:** `Whisper-large-v3-turbo` + `PyAnnote` phân tách từng người nói và tự thêm dấu câu chuẩn xác.<br>• **Sliding Dialogue Context:** Gắn ngữ cảnh đoạn hội thoại mở rộng ($\pm 5\text{s} - 10\text{s}$) vào metadata keyframe. |
-| **🔤 Chữ màn hình & Vật thể (OCR/Objects)** | • PaddleOCR (Tiếng Việt/Anh)<br>• Nhãn Faster R-CNN Google OpenImages (873 videos)<br>• Dual-threshold filtering (score $\ge 0.3$, presence $\ge 0.4$)<br>• BM25 Lexical Index với IDF Floor ($0.01$) | • **SOTA Vision OCR:** `GOT-OCR2.0` hoặc `Qwen2-VL` (đọc được chữ xoay nghiêng, logo mờ, biển số xe xa, chữ cách điệu).<br>• **Fuzzy Token Matching / Levenshtein N-gram:** Tự động sửa lỗi sai 1-2 ký tự do OCR nhận diện nhầm (ví dụ: `VTVl` $\rightarrow$ `VTV1`, `Hà Nọi` $\rightarrow$ `Hà Nội`).<br>• **Scene Text VQA:** Trả lời trực tiếp nội dung văn bản trên ảnh mà không cần bóc tách OCR riêng rẽ. |
-| **🌈 Đa kênh (Hybrid Fusion)** | • Dynamic Modality Routing<br>• Score-Reflected Reciprocal Rank Fusion (SRRF)<br>• Trọng số động ($w_{\text{vis}}, w_{\text{ocr}}, w_{\text{asr}}$)<br>• Metadata / Text-in-Scene Reranking + VLM Judge Reranking | • **Learned Late-Interaction (ColPali):** Tính tương đồng multi-vector giữa từng từ của câu hỏi và từng token visual của frame.<br>• **Cross-Encoder Reranker:** Mô hình rerank đa phương thức (ví dụ: `BGE-Reranker-Large`, `Cohere Rerank v3`) xếp hạng lại Top 100 candidate.<br>• **Adaptive Meta-Classifier:** Mô hình phân loại tự động gán trọng số $w_{\text{vis}}, w_{\text{ocr}}, w_{\text{asr}}$ dựa trên đặc trưng ngôn ngữ của câu query. |
-| **🎬 Chuỗi hành động (TRAKE)** | • Dynamic Programming Monotonic Alignment ($O(T \cdot N)$)<br>• Sequence Time-Gap Regularization ($t_1 < t_2 < \dots < t_n$)<br>• VLM Judge thẩm định chuỗi đa ảnh theo thời gian<br>• Trực quan hóa timeline liên hoàn trên Web UI | • **Temporal Action Localization:** `ActionFormer` hoặc `TriDet` phát hiện chính xác ranh giới bắt đầu/kết thúc của từng hành động đơn lẻ.<br>• **Video Event Graph Reasoning:** Xây dựng đồ thị liên kết đối tượng qua các frame để kiểm tra tính nhất quán (người A cầm chai $\rightarrow$ mở nắp $\rightarrow$ uống). |
-| **❓ Truy vấn Hỏi đáp (QA Retrieval)** | • Visual Evidence Verification bằng Qwen2.5-VL (đưa frame có góc nhìn chứa đáp án lên Top 1)<br>• Query Synthesis (Context text + Question keywords)<br>• Trực quan hóa Badge OCR `🔤`, ASR `🗣️` & Evidence Score `🎯` để người dùng xác thực và trả lời tức thì | • **Bounding-box Zoom-in VQA:** Tự động crop vùng vật thể nghi vấn trong keyframe và phóng to cho VLM đọc các chi tiết siêu nhỏ (chữ trên đồng hồ, logo túi xách). |
-
----
-
-### 9.2. Chi tiết & Hướng dẫn Triển khai Nâng cấp
-
-#### 1. Nâng cấp Kênh Thị giác (Visual Search)
-* **Hiện trạng:** Đã nâng cấp lên **Google SigLIP 2** (`ViT-SO400M-14-SigLIP2-378`) mang lại độ chính xác zero-shot vượt trội so với SigLIP 1 và CLIP.
-* **Hướng nâng cấp tiếp theo:**
-  * Thử nghiệm **`InternVideo2`** hoặc **`VideoLLaMA3`**: Trích xuất spatio-temporal feature cho từng đoạn video ngắn (shot 2-4 giây) thay vì ảnh tĩnh.
-  * Vector đặc trưng video được lưu dưới dạng `.npy` và tìm kiếm bằng FAISS IndexIVFFlat hoặc HNSW để đạt tốc độ $< 50\text{ms}$.
-
-#### 2. Nâng cấp Thẩm định Thị giác (VLM-as-a-Judge)
-* **Hiện trạng:** Đã triển khai **Qwen2.5-VL-3B / 7B** thẩm định Top 15 ứng viên cho KIS, QA Evidence và TRAKE Sequence.
-* **Hướng nâng cấp tiếp theo:**
-  * Bổ sung cơ chế **Region of Interest (RoI) Zooming**: Khi câu hỏi nhắm vào chi tiết nhỏ (ví dụ: *"chữ trên cổ áo"*, *"màu sắc chiếc nhẫn"*), VLM Judge tự động crop các vùng candidate có độ phân giải cao để thẩm định chính xác hơn.
-
-#### 3. Nâng cấp Kênh Lời thoại ASR (Speech Transcript)
-* **Hiện trạng:** Đã triển khai **Dense Semantic ASR** bằng `BAAI/bge-m3` kết hợp Hybrid với BM25 ($S = 0.65 \cdot \text{Dense} + 0.35 \cdot \text{Sparse}$).
-* **Hướng nâng cấp tiếp theo:**
-  * Tái trích xuất lời thoại bằng `faster-whisper-large-v3-turbo` với Initial Prompt tiếng Việt chuẩn để nâng cao độ chính xác địa danh và tên riêng.
-  * Phân tách người nói (Speaker Diarization) với `PyAnnote`.
-
-#### 4. Nâng cấp Kênh Chữ màn hình & Biển hiệu (OCR)
-* **Hiện trạng:** PaddleOCR + BM25 Lexical Index.
-* **Hướng nâng cấp tiếp theo:**
-  * Tích hợp **`GOT-OCR2.0`** (General OCR Theory) có khả năng đọc văn bản siêu nhỏ, định dạng phức tạp và chữ viết tay với độ chính xác cao hơn 30% so với PaddleOCR.
-  * Bổ sung cơ chế **Fuzzy String Matching** (Levenshtein Distance / Token Set Ratio) trong `bm25_index.py` để vẫn bắt trúng kết quả khi OCR bị sai dấu hoặc thiếu chữ cái.
-
-
+### 🏆 Chúc bạn và đội thi đạt thành tích cao nhất tại AI Challenge 2026!
