@@ -49,13 +49,22 @@ class BGEM3TextEmbedder:
 
         resolved_device = self.device or "cpu"
 
+        target_path = self.model_name
+        from pathlib import Path
+        for candidate_dir in [
+            Path(r"D:\bachkhoa\ai_challenge\data\.cache\huggingface\hub\models--BAAI--bge-m3\snapshots\5617a9f61b028005a4858fdac845db406aefb181"),
+            Path("data/.cache/huggingface/hub/models--BAAI--bge-m3/snapshots/5617a9f61b028005a4858fdac845db406aefb181"),
+        ]:
+            if (candidate_dir / "model.safetensors").exists():
+                target_path = str(candidate_dir)
+                break
+
         try:
             logger.info("BGEM3TextEmbedder: Loading %s on %s...", self.model_name, resolved_device)
-            self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            self._tokenizer = AutoTokenizer.from_pretrained(target_path)
             self._model = AutoModel.from_pretrained(
-                self.model_name,
+                target_path,
                 low_cpu_mem_usage=True,
-                use_safetensors=True,
                 dtype=torch.float32,
             )
             self._model.to(resolved_device)
