@@ -47,6 +47,9 @@ def normalize_model_name(model_name: str, pretrained: str | None = None) -> tupl
     return model_name, pretrained or "webli"
 
 
+_MODEL_CACHE: dict[tuple[str, str, str], tuple[Any, Any, Any]] = {}
+
+
 class OpenCLIPTextEmbedder:
     """Text encoder matching CLIP/SigLIP/SigLIP 2 features with multi-template prompt ensembling."""
     def __init__(
@@ -72,16 +75,24 @@ class OpenCLIPTextEmbedder:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if str(self.device).lower().startswith("cuda") and not torch.cuda.is_available():
             self.device = "cpu"
-        self.model, _, self.preprocess = open_clip.create_model_and_transforms(
-            self.model_name, pretrained=self.pretrained, device=self.device
-        )
-        # Purge massive vision transformer (saves ~3.5GB RAM on CPU, prevents disk paging)
-        if hasattr(self.model, "visual"):
-            del self.model.visual
-        import gc
-        gc.collect()
-        self.tokenizer = self._get_tokenizer_safe(self.model_name)
-        self.model.eval()
+
+        cache_key = (self.model_name, self.pretrained, str(self.device))
+        if cache_key in _MODEL_CACHE:
+            self.model, self.preprocess, self.tokenizer = _MODEL_CACHE[cache_key]
+        else:
+            self.model, _, self.preprocess = open_clip.create_model_and_transforms(
+                self.model_name, pretrained=self.pretrained, device=self.device
+            )
+            # Purge massive vision transformer (saves ~3.5GB RAM on CPU, prevents disk paging)
+            if hasattr(self.model, "visual"):
+                del self.model.visual
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            self.tokenizer = self._get_tokenizer_safe(self.model_name)
+            self.model.eval()
+            _MODEL_CACHE[cache_key] = (self.model, self.preprocess, self.tokenizer)
 
     def encode(
         self,

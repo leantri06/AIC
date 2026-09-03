@@ -397,6 +397,12 @@ class RetrievalTools:
                 )
             except Exception as exc:
                 logger.warning("BLIP-2 ITM reranking failed: %s", exc)
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except Exception:
+                    pass
 
         # Shot-level diversity / Temporal NMS
         if self.temporal_nms_enabled and candidates:

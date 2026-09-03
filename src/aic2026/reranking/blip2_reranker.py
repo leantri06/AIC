@@ -52,6 +52,17 @@ class BLIP2ITMReranker:
         else:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
+        if self.device == "cuda" and torch.cuda.is_available():
+            free_vram_gb = torch.cuda.mem_get_info()[0] / (1024**3)
+            if free_vram_gb < 2.0:
+                logger.warning(
+                    "Not enough free VRAM for BLIP-2 (need ~2.5GB, only %.2fGB free). Skipping BLIP-2.",
+                    free_vram_gb,
+                )
+                raise RuntimeError(
+                    f"VRAM không đủ ({free_vram_gb:.2f}GB < 2.5GB) để chạy BLIP-2 ITM."
+                )
+
         # On CUDA GTX 1070 (Pascal), use float16 to conserve VRAM (takes ~2.5GB)
         self.dtype = torch.float16 if self.device == "cuda" else torch.float32
 
@@ -62,13 +73,17 @@ class BLIP2ITMReranker:
             self.dtype,
         )
 
-        self.processor = AutoProcessor.from_pretrained(self.model_name)
-        self.model = Blip2ForImageTextRetrieval.from_pretrained(
-            self.model_name,
-            torch_dtype=self.dtype,
-        ).to(self.device)
-        self.model.eval()
-        logger.info("BLIP-2 ITM loaded successfully on %s.", self.device)
+        try:
+            self.processor = AutoProcessor.from_pretrained(self.model_name)
+            self.model = Blip2ForImageTextRetrieval.from_pretrained(
+                self.model_name,
+                torch_dtype=self.dtype,
+            ).to(self.device)
+            self.model.eval()
+            logger.info("BLIP-2 ITM loaded successfully on %s.", self.device)
+        except Exception:
+            self.unload()
+            raise
 
     def unload(self) -> None:
         """Free model from VRAM/RAM when not in active use."""
