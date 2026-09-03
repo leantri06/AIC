@@ -14,7 +14,6 @@ gatherUsageStats = false
 [runner]
 magicEnabled = false
 fastReruns = false
-enforceZeroRerunWarning = false
 
 [client]
 showErrorDetails = true
