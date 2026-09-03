@@ -418,6 +418,96 @@ h1, h2, h3, h4, h5, p, span, label {{
   border-color: #6366f1 !important;
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25) !important;
 }}
+/* Circular Loading Spinner */
+.peg-loader-card {{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 24px;
+  margin: 25px auto;
+  background: var(--card-bg, #111827);
+  border: 1.5px solid var(--border-color, #1e293b);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  max-width: 480px;
+  text-align: center;
+  animation: peg-fadein 0.25s ease-out;
+}}
+@keyframes peg-fadein {{
+  from {{ opacity: 0; transform: translateY(8px); }}
+  to {{ opacity: 1; transform: translateY(0); }}
+}}
+.peg-spinner-ring {{
+  position: relative;
+  width: 76px;
+  height: 76px;
+  margin-bottom: 18px;
+}}
+.peg-spinner-ring div {{
+  box-sizing: border-box;
+  display: block;
+  position: absolute;
+  width: 76px;
+  height: 76px;
+  border: 4px solid transparent;
+  border-radius: 50%;
+  animation: peg-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}}
+.peg-spinner-ring div:nth-child(1) {{
+  border-top-color: #6366f1;
+  border-right-color: #818cf8;
+  animation-delay: -0.45s;
+}}
+.peg-spinner-ring div:nth-child(2) {{
+  border-top-color: #38bdf8;
+  border-left-color: #0284c7;
+  animation-delay: -0.3s;
+}}
+.peg-spinner-ring div:nth-child(3) {{
+  border-top-color: #ec4899;
+  animation-delay: -0.15s;
+}}
+@keyframes peg-spin {{
+  0% {{ transform: rotate(0deg); }}
+  100% {{ transform: rotate(360deg); }}
+}}
+.peg-spinner-icon {{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  animation: peg-pulse 1.4s ease-in-out infinite;
+}}
+@keyframes peg-pulse {{
+  0%, 100% {{ transform: translate(-50%, -50%) scale(0.88); opacity: 0.85; }}
+  50% {{ transform: translate(-50%, -50%) scale(1.15); opacity: 1; }}
+}}
+.peg-loader-title {{
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text-main, #f8fafc);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}}
+.peg-loader-sub {{
+  font-size: 0.86rem;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.5;
+}}
+.peg-loader-badge {{
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #a5b4fc;
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-family: monospace;
+}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -1441,8 +1531,32 @@ if st.session_state.get("_run_agent"):
                 }
                 backend_url = st.session_state.get("cfg_backend", "http://127.0.0.1:8000")
 
-                with st.spinner(f"🔍 PEGASUS đang tìm kiếm frame với mô hình {model_choice}..."):
+                loading_box = st.empty()
+                mode_label = {
+                    "hybrid": "Đa kênh Hybrid (SigLIP 2 + OCR + ASR)",
+                    "siglip": "Thị giác SigLIP 2 (Visual Only)",
+                    "asr": "Lời thoại âm thanh (ASR BGE-M3)",
+                    "ocr": "Chữ trên màn hình (OCR BM25)",
+                }.get(runtime["search_mode"], runtime["search_mode"].upper())
+
+                loading_box.markdown(f"""
+                <div class="peg-loader-card">
+                  <div class="peg-spinner-ring">
+                    <div></div><div></div><div></div>
+                    <div class="peg-spinner-icon">🔍</div>
+                  </div>
+                  <div class="peg-loader-title">Đang quét tìm kiếm Keyframe...</div>
+                  <div class="peg-loader-sub">
+                    Đối chiếu không gian vector trên <b>177,321</b> khung hình video
+                  </div>
+                  <div class="peg-loader-badge">{model_choice} • {mode_label}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                try:
                     result = run_backend(query_type, query, runtime, backend_url)
+                finally:
+                    loading_box.empty()
 
                 st.session_state.update(
                     query=query,
