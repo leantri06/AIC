@@ -4,6 +4,9 @@ import os
 
 # Fix OpenMP duplicate lib runtime conflict on Windows (Error #15 / 0xC0000005)
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 data_root = None
 for candidate in [

@@ -13,6 +13,9 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+_SHARED_BGEM3_CACHE: dict[str, tuple[Any, Any]] = {}
+
+
 class BGEM3TextEmbedder:
     """Multilingual & Vietnamese Dense Semantic Embedder powered by BAAI/bge-m3.
 
@@ -59,6 +62,13 @@ class BGEM3TextEmbedder:
                 target_path = str(candidate_dir)
                 break
 
+        cache_key = f"{target_path}:{resolved_device}"
+        if cache_key in _SHARED_BGEM3_CACHE:
+            self._tokenizer, self._model = _SHARED_BGEM3_CACHE[cache_key]
+            self._torch = torch
+            self._loaded = True
+            return
+
         try:
             logger.info("BGEM3TextEmbedder: Loading %s on %s...", self.model_name, resolved_device)
             self._tokenizer = AutoTokenizer.from_pretrained(target_path)
@@ -71,6 +81,7 @@ class BGEM3TextEmbedder:
             self._model.eval()
             self._torch = torch
             self._loaded = True
+            _SHARED_BGEM3_CACHE[cache_key] = (self._tokenizer, self._model)
             logger.info("BGEM3TextEmbedder: Successfully loaded %s", self.model_name)
         except Exception as exc:
             logger.warning("BGEM3TextEmbedder: Failed to load %s: %s", self.model_name, exc)
