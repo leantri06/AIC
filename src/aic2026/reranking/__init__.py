@@ -15,8 +15,11 @@ from .lexical import (
     rrf_rank,
 )
 from .vlm_judge import JudgeResult, VLMJudge
+from .blip2_reranker import BLIP2ITMReranker, apply_temporal_nms
 
 __all__ = [
+    "BLIP2ITMReranker",
+    "apply_temporal_nms",
     "JudgeResult",
     "RRF_K",
     "VLMJudge",

@@ -1394,8 +1394,8 @@ with st.form("query_form", border=False):
         if submitted:
             st.session_state["_run_agent"] = True
 
-# Gợi ý đề mẫu 1-Click (Sử dụng on_click callback an toàn) & Tùy chọn Dịch
-chip_col1, chip_col2, chip_col3, chip_col4, tr_col = st.columns([1, 1, 1.2, 1, 1], gap="small")
+# Gợi ý đề mẫu 1-Click (Sử dụng on_click callback an toàn)
+chip_col1, chip_col2, chip_col3, chip_col4 = st.columns([1, 1, 1.2, 1], gap="small")
 with chip_col1:
     st.button(
         "🚗 Xe tự hành (QA)",
@@ -1426,14 +1426,14 @@ with chip_col2:
     )
 with chip_col3:
     st.button(
-        "🚶‍♂️ Lấy nước (TRAKE)",
-        key="chip_trake_fridge",
+        "🚑 Xe cứu thương (TRAKE)",
+        key="chip_trake_amb",
         on_click=apply_preset_query,
         kwargs={
             "q_type": "trake",
-            "s_mode": "siglip",
-            "q_text": "",
-            "q_events": "A person opens the refrigerator\nThe person takes out a bottle of water\nThe person drinks water from the bottle",
+            "s_mode": "hybrid",
+            "q_events": "Một chiếc xe cứu thương màu trắng di chuyển trên đường phố đông đúc.\nXe cứu thương rẽ vào cổng bệnh viện lớn.\nCác nhân viên y tế mở cửa sau xe đẩy cáng cứu thương vào bên trong.",
+            "translate": True,
             "model": "siglip2",
         },
         **_FULL_WIDTH,
@@ -1528,6 +1528,9 @@ if st.session_state.get("_run_agent"):
                     "search_mode": str(st.session_state.get("search_mode", "hybrid") or "hybrid"),
                     "coarse_top_k": int(st.session_state.get("cfg_coarse_top_k", 200)),
                     "vlm_backend": "none",
+                    "blip2_rerank_enabled": bool(st.session_state.get("cfg_blip2_rerank", False)),
+                    "blip2_top_k": 30,
+                    "temporal_nms_enabled": bool(st.session_state.get("cfg_temporal_nms", True)),
                 }
                 backend_url = st.session_state.get("cfg_backend", "http://127.0.0.1:8000")
 
@@ -1538,6 +1541,11 @@ if st.session_state.get("_run_agent"):
                     "asr": "Lời thoại âm thanh (ASR BGE-M3)",
                     "ocr": "Chữ trên màn hình (OCR BM25)",
                 }.get(runtime["search_mode"], runtime["search_mode"].upper())
+
+                if runtime["blip2_rerank_enabled"]:
+                    mode_label += " • ⚡ BLIP-2 ITM GPU"
+                if runtime["temporal_nms_enabled"]:
+                    mode_label += " • 🎯 NMS Diversity"
 
                 loading_box.markdown(f"""
                 <div class="peg-loader-card">

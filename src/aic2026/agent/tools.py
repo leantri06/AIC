@@ -64,6 +64,15 @@ class RetrievalTools:
     vlm_judge_top_k: int = 15
     vlm_judge_weight: float = 0.5
     vlm_judge_obj: Any | None = None
+    # BLIP-2 Cross-Encoder ITM Reranker (arXiv:2512.12935v1)
+    blip2_rerank_enabled: bool = False
+    blip2_top_k: int = 30
+    blip2_gamma: float = 0.8
+    blip2_obj: Any | None = None
+    # Shot-level diversity / Temporal NMS
+    temporal_nms_enabled: bool = False
+    temporal_nms_window: int = 60
+    temporal_nms_max_per_video: int = 3
     asr_embedder_obj: Any | None = None
     encode_images: Callable[[list[object]], np.ndarray] | None = None
     bm25_index: BM25Index | None = None
@@ -373,6 +382,33 @@ class RetrievalTools:
                 candidates,
                 top_videos=top_videos,
             )
+
+        # BLIP-2 Cross-Encoder ITM Reranking (arXiv:2512.12935v1)
+        if self.blip2_rerank_enabled and candidates:
+            try:
+                from aic2026.reranking import BLIP2ITMReranker
+                if self.blip2_obj is None:
+                    self.blip2_obj = BLIP2ITMReranker(device=self.vlm_device or None)
+                candidates = self.blip2_obj.rerank(
+                    query=queries[0],
+                    candidates=candidates,
+                    top_k=self.blip2_top_k,
+                    gamma=self.blip2_gamma,
+                )
+            except Exception as exc:
+                logger.warning("BLIP-2 ITM reranking failed: %s", exc)
+
+        # Shot-level diversity / Temporal NMS
+        if self.temporal_nms_enabled and candidates:
+            try:
+                from aic2026.reranking import apply_temporal_nms
+                candidates = apply_temporal_nms(
+                    candidates,
+                    frame_window=self.temporal_nms_window,
+                    max_per_video=self.temporal_nms_max_per_video,
+                )
+            except Exception as exc:
+                logger.warning("Temporal NMS failed: %s", exc)
 
         return candidates
 

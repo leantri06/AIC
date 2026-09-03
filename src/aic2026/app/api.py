@@ -89,6 +89,12 @@ class RuntimeConfig(BaseModel):
     # Số thread song song gọi VLM (mỗi video 1 thread). Giảm xuống 3 để tránh
     # nghẽn Ollama local — Ollama xử lý tuần tự nên thread quá nhiều chỉ tăng queue.
     vlm_max_workers: int = 3
+    # BLIP-2 Cross-Encoder ITM Reranker (arXiv:2512.12935v1)
+    blip2_rerank_enabled: bool = False
+    blip2_top_k: int = 30
+    # Shot-level diversity / Temporal NMS
+    temporal_nms_enabled: bool = False
+    temporal_nms_window: int = 60
 
 
 class TaskRequest(BaseModel):
@@ -130,6 +136,9 @@ def load_orchestrator(
     vlm_judge_model: str = "Qwen/Qwen2.5-VL-7B-Instruct",
     vlm_judge_backend: str = "qwen",
     vlm_judge_top_k: int = 15,
+    blip2_rerank_enabled: bool = False,
+    blip2_top_k: int = 30,
+    temporal_nms_enabled: bool = False,
 ):
     """Shared layer: index + encoders load once per runtime configuration."""
     from aic2026.agent import OllamaLLM, RetrievalAgent
@@ -221,6 +230,11 @@ def load_orchestrator(
         tools.vlm_judge_model = vlm_judge_model
         tools.vlm_judge_backend = vlm_judge_backend
         tools.vlm_judge_top_k = vlm_judge_top_k
+    if blip2_rerank_enabled:
+        tools.blip2_rerank_enabled = True
+        tools.blip2_top_k = blip2_top_k
+    if temporal_nms_enabled:
+        tools.temporal_nms_enabled = True
     agent = RetrievalAgent(
         tools,
         llm=OllamaLLM(
@@ -280,6 +294,9 @@ def run_task(task_type: str, request: TaskRequest) -> AgentResult:
             vlm_judge_model=config.vlm_judge_model,
             vlm_judge_backend=config.vlm_judge_backend,
             vlm_judge_top_k=config.vlm_judge_top_k,
+            blip2_rerank_enabled=getattr(config, "blip2_rerank_enabled", False),
+            blip2_top_k=getattr(config, "blip2_top_k", 30),
+            temporal_nms_enabled=getattr(config, "temporal_nms_enabled", False),
         )
         res = orchestrator.run(Query(query_id=request.query_id, type=task_type, text=request.text, question=request.question, events=request.events))
         trim_process_memory()
