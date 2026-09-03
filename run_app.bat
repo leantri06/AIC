@@ -16,8 +16,14 @@ set "OPENBLAS_NUM_THREADS=1"
 set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
 if exist "D:\bachkhoa\ai_challenge\data" (
     set "HF_HOME=D:\bachkhoa\ai_challenge\data\.cache\huggingface"
+    set "TORCH_HOME=D:\bachkhoa\ai_challenge\data\.cache\torch"
+    set "UV_CACHE_DIR=D:\bachkhoa\ai_challenge\data\.cache\uv"
+    set "PIP_CACHE_DIR=D:\bachkhoa\ai_challenge\data\.cache\pip"
 ) else (
     set "HF_HOME=D:\ai_challenge\data\.cache\huggingface"
+    set "TORCH_HOME=D:\ai_challenge\data\.cache\torch"
+    set "UV_CACHE_DIR=D:\ai_challenge\data\.cache\uv"
+    set "PIP_CACHE_DIR=D:\ai_challenge\data\.cache\pip"
 )
 set "PYTHONPATH=src;%PYTHONPATH%"
 

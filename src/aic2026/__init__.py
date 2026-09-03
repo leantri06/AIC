@@ -5,10 +5,21 @@ import os
 # Fix OpenMP duplicate lib runtime conflict on Windows (Error #15 / 0xC0000005)
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-if os.path.exists(r"D:\bachkhoa\ai_challenge\data"):
-    os.environ.setdefault("HF_HOME", r"D:\bachkhoa\ai_challenge\data\.cache\huggingface")
-elif os.path.exists(r"D:\ai_challenge\data"):
-    os.environ.setdefault("HF_HOME", r"D:\ai_challenge\data\.cache\huggingface")
+data_root = None
+for candidate in [
+    r"D:\bachkhoa\ai_challenge\data",
+    r"D:\ai_challenge\data",
+]:
+    if os.path.exists(candidate):
+        data_root = candidate
+        break
+
+if data_root:
+    cache_dir = os.path.join(data_root, ".cache")
+    os.environ.setdefault("HF_HOME", os.path.join(cache_dir, "huggingface"))
+    os.environ.setdefault("TORCH_HOME", os.path.join(cache_dir, "torch"))
+    os.environ.setdefault("UV_CACHE_DIR", os.path.join(cache_dir, "uv"))
+    os.environ.setdefault("PIP_CACHE_DIR", os.path.join(cache_dir, "pip"))
 
 __version__ = "0.1.0"
 
