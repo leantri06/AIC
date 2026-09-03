@@ -1444,12 +1444,28 @@ with chip_col4:
         },
         **_FULL_WIDTH,
     )
-with tr_col:
+# Tùy chọn Tăng Tốc & Nâng Cao Chất Lượng Ranking
+rank_opt_col1, rank_opt_col2, rank_opt_col3 = st.columns([1, 1.4, 1.4], gap="small")
+with rank_opt_col1:
     translate_query = st.checkbox(
         "🌐 Dịch VI→EN",
         value=st.session_state.get("cfg_translate", False),
         key="cfg_translate",
         help="Dịch truy vấn tiếng Việt sang tiếng Anh trước khi đưa vào SigLIP. Bật khi nhập tiếng Việt.",
+    )
+with rank_opt_col2:
+    blip2_rerank = st.checkbox(
+        "⚡ BLIP-2 GPU Reranker",
+        value=st.session_state.get("cfg_blip2_rerank", False),
+        key="cfg_blip2_rerank",
+        help="Sử dụng Cross-Attention BLIP-2 ITM trên GPU để soi chi tiết từng pixel, đẩy keyframe chuẩn xác nhất lên Top 1 (arXiv:2512.12935v1).",
+    )
+with rank_opt_col3:
+    temporal_nms = st.checkbox(
+        "🎯 Lọc Đa Dạng Hóa (NMS)",
+        value=st.session_state.get("cfg_temporal_nms", True),
+        key="cfg_temporal_nms",
+        help="Loại bỏ các frame bị trùng lặp sát nhau trong cùng 1 video, giúp Top 10-20 đa dạng các góc máy & video khác nhau.",
     )
 
 # ---------------------------------------------------------------------------
