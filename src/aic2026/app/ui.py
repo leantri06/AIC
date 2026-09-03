@@ -480,6 +480,19 @@ def run_backend(task_type: str, query: Query, runtime: dict, backend_url: str):
         raise BackendRequestError("Backend không trả về dữ liệu hợp lệ.") from exc
 
 
+def trim_process_memory() -> None:
+    """Flush unreferenced heap and cache pages from Windows working set back to the OS."""
+    import gc
+    import sys
+    gc.collect()
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
+        except Exception:
+            pass
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -1440,6 +1453,7 @@ if st.session_state.get("_run_agent"):
                     selected=[],
                     _query_nonce=st.session_state.get("_query_nonce", 0) + 1,
                 )
+                trim_process_memory()
 
                 translated = None
                 translation_source = None

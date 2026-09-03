@@ -97,4 +97,4 @@ def load_index_for_query(
             f"'.npy' or a regenerated manifest usually causes this; rebuild both "
             f"from the same source with `prepare-official`."
         )
-    return VectorIndex.from_npy(features)
+    return VectorIndex.from_npy(features, mmap=True)

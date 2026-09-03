@@ -181,8 +181,8 @@ def load_orchestrator(
     asr_features = None
     if asr_dense_file is not None:
         try:
-            asr_features = np.load(asr_dense_file)
-            logger.info("Loaded Dense ASR features %s from %s", asr_features.shape, asr_dense_file)
+            asr_features = np.load(asr_dense_file, mmap_mode="r")
+            logger.info("Loaded Dense ASR features %s from %s (mmap)", asr_features.shape, asr_dense_file)
         except Exception as exc:
             logger.warning("Failed to load asr_dense_features from %s: %s", asr_dense_file, exc)
 
@@ -236,6 +236,19 @@ def load_orchestrator(
     return agent
 
 
+def trim_process_memory() -> None:
+    """Flush unreferenced heap and cache pages from Windows working set back to the OS."""
+    import gc
+    import sys
+    gc.collect()
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
+        except Exception:
+            pass
+
+
 def run_task(task_type: str, request: TaskRequest) -> AgentResult:
     if task_type == "qa" and not request.question:
         request.question = request.text
@@ -268,8 +281,9 @@ def run_task(task_type: str, request: TaskRequest) -> AgentResult:
             vlm_judge_backend=config.vlm_judge_backend,
             vlm_judge_top_k=config.vlm_judge_top_k,
         )
-        orchestrator.search_mode = config.search_mode
-        return orchestrator.run(Query(query_id=request.query_id, type=task_type, text=request.text, question=request.question, events=request.events))
+        res = orchestrator.run(Query(query_id=request.query_id, type=task_type, text=request.text, question=request.question, events=request.events))
+        trim_process_memory()
+        return res
     except HTTPException:
         raise
     except FileNotFoundError as error:
