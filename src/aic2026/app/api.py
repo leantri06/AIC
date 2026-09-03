@@ -251,16 +251,9 @@ def load_orchestrator(
 
 
 def trim_process_memory() -> None:
-    """Flush unreferenced heap and cache pages from Windows working set back to the OS."""
+    """Run garbage collection without dumping resident memory to disk."""
     import gc
-    import sys
     gc.collect()
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
-        except Exception:
-            pass
 
 
 def run_task(task_type: str, request: TaskRequest) -> AgentResult:

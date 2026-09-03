@@ -571,16 +571,9 @@ def run_backend(task_type: str, query: Query, runtime: dict, backend_url: str):
 
 
 def trim_process_memory() -> None:
-    """Flush unreferenced heap and cache pages from Windows working set back to the OS."""
+    """Run garbage collection without dumping resident memory to disk."""
     import gc
-    import sys
     gc.collect()
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
-        except Exception:
-            pass
 
 
 # ---------------------------------------------------------------------------
@@ -1505,6 +1498,50 @@ active_videos_root = st.session_state.get("cfg_videos_root") or auto_paths["vide
 active_map_keyframes = st.session_state.get("cfg_map_keyframes") or auto_paths["map_keyframes"]
 active_clip_model = auto_paths["clip_model"]
 active_clip_pretrained = auto_paths["clip_pretrained"]
+
+
+@st.cache_resource(show_spinner=False)
+def preload_all_resources(
+    manifest_path: str,
+    features_path: str,
+    clip_model: str,
+    clip_pretrained: str,
+):
+    """Pre-warm all heavy models, CUDA kernels, and tables at startup."""
+    # 1. Preload all UI manifest tables (keyframes, asr, ocr, timelines)
+    load_all_manifest_tables(manifest_path)
+
+    # 2. Run a 1-shot micro warmup query so load_orchestrator, SigLIP 2, BM25, and CUDA are 100% primed
+    from aic2026.app.api import TaskRequest, RuntimeConfig, run_task
+    try:
+        warmup_req = TaskRequest(
+            query_id="warmup-startup",
+            text="warmup",
+            runtime=RuntimeConfig(
+                manifest_path=manifest_path,
+                features_path=features_path,
+                clip_model=clip_model,
+                clip_pretrained=clip_pretrained,
+                vlm_backend="none",
+                search_mode="hybrid",
+                coarse_top_k=10,
+            ),
+        )
+        run_task("kis", warmup_req)
+    except Exception:
+        pass
+    return True
+
+
+# Tự động nạp trước toàn bộ tài nguyên khi vừa mở ứng dụng
+if active_manifest and Path(active_manifest).exists():
+    with st.spinner("🚀 Đang nạp trước toàn bộ mô hình và dữ liệu (SigLIP 2, BM25, 177k keyframes)..."):
+        preload_all_resources(
+            active_manifest,
+            active_features,
+            active_clip_model,
+            active_clip_pretrained,
+        )
 
 if st.session_state.get("_run_agent"):
     st.session_state["_run_agent"] = False

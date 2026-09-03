@@ -55,6 +55,7 @@ class BGEM3TextEmbedder:
             self._model = AutoModel.from_pretrained(
                 self.model_name,
                 low_cpu_mem_usage=True,
+                use_safetensors=True,
                 dtype=torch.float32,
             )
             self._model.to(resolved_device)
