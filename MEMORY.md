@@ -56,6 +56,6 @@ Cập nhật: 2026-09-21 (Asia/Saigon).
 
 - Các kiểm tra dữ liệu/move ở trên đã đạt, ngoài phát hiện khóa trùng được ghi rõ.
 - Không thay đổi code runtime nên không chạy model/app hay test suite trong đợt dọn này.
-- Commit/push: đang chuẩn bị; xác nhận trạng thái remote ở phần nhật ký Git trước khi kết thúc phiên.
+- Commit `e3599a0` đã push thành công lên `origin/main` ngày 2026-09-21 (Git báo `5e7efbf..e3599a0 main -> main`). Bản cập nhật nhật ký này được lưu bằng commit tiếp theo; dùng `git status -sb` và `git log -2 --oneline` để xác nhận trạng thái mới nhất.
 - Git sandbox báo ownership khác người dùng; dùng `git -c safe.directory=D:/bachkhoa/ai_challenge/my-repo ...` theo từng lệnh, không đổi global config.
 - Python `.venv` cần quyền ngoài sandbox (uv trampoline bị permission denied trong sandbox).
