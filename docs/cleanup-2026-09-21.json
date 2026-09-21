@@ -1,0 +1,26 @@
+[
+  {
+    "source": "submission",
+    "destination": "archive/submissions/2026-09-21/submission",
+    "files": 33,
+    "sha256_verified": true
+  },
+  {
+    "source": "submission_2",
+    "destination": "archive/submissions/2026-09-21/submission_2",
+    "files": 30,
+    "sha256_verified": true
+  },
+  {
+    "source": "submission.zip",
+    "destination": "archive/submissions/2026-09-21/submission.zip",
+    "files": 1,
+    "sha256_verified": true
+  },
+  {
+    "source": "Thong tin vong So tuyen AIC2026.pdf",
+    "destination": "docs/reference/Thong tin vong So tuyen AIC2026.pdf",
+    "files": 1,
+    "sha256_verified": true
+  }
+]

@@ -1,5 +1,8 @@
 # 🚀 AIC 2026 — PEGASUS Video Retrieval System
 
+> Tiếp tục công việc: đọc [MEMORY.md](MEMORY.md) và [AGENTS.md](AGENTS.md).
+> Bố trí workspace, lưu trữ bản nộp và chuẩn bị batch2: [docs/WORKSPACE.md](docs/WORKSPACE.md).
+
 Hệ thống tìm kiếm video đa phương thức tối tân phục vụ 3 bài toán trọng tâm vòng sơ tuyển **AI Challenge 2026 (KIS / Q&A / TRAKE)**:
 * **👁️ Visual Vector Search SOTA:** **Google SigLIP 2** (`ViT-SO400M-14-SigLIP2-378` / alias: `siglip2`) & `siglip2-base`.
 * **💻 Kiến Trúc Dual-Hardware (GPU & CPU):** Tự động nhận diện phần cứng thông minh — **chạy siêu tốc trên GPU NVIDIA CUDA ($\le 1\text{s}$) và chạy mượt mà, ổn định trên máy thuần CPU (không cần GPU rời)**.

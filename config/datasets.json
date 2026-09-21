@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "path_base": "workspace (parent of repository)",
+  "note": "Inventory and planned layout only; not consumed by the application yet.",
+  "batches": {
+    "batch1": {
+      "status": "existing",
+      "raw": "data/raw_data",
+      "extracted": "data/extracted",
+      "processed": "data/processed"
+    },
+    "batch2": {
+      "status": "awaiting_data",
+      "raw": "data/batches/batch2/raw",
+      "extracted": "data/batches/batch2/extracted",
+      "processed": "data/batches/batch2/processed"
+    }
+  },
+  "combined_output": "data/combined",
+  "active_data_root": "data"
+}
