@@ -96,6 +96,26 @@ Cập nhật: 2026-09-22 (Asia/Saigon).
 2. Sau khi đủ 18/18, chạy lại downloader bản mới một lần để xác nhận trạng thái và ZIP, rồi cập nhật memory thành hoàn tất.
 3. Theo dõi sheet cho M01-M04 và các gói Keyframes/map/objects/CLIP; chưa thể tạo index batch2 chỉ từ video và metadata hiện có.
 
+## Giải nén và sắp xếp Batch 2 ngày 2026-09-22
+
+1. Đã thêm `scripts/extract_batch2.py`: chỉ nhận ZIP hoàn chỉnh, chặn đường dẫn
+   không an toàn, chuẩn hóa thư mục thành `Videos/` và `Metadata/`, xác minh số
+   file/kích thước, lưu state để tiếp tục, và chỉ xóa ZIP sau xác minh khi dùng
+   `--delete-archives-after-verify`.
+2. Người dùng cho phép xóa ZIP sau khi giải nén. Đã giải nén, xác minh và xóa:
+   `media-info-aic25-b2.zip`, `Video_N001-N010.zip`, `Video_N011-N020.zip`,
+   `Video_N021-N030.zip`, `Video_N031-N040.zip`, `Video_N041-N050.zip`.
+3. Kết quả đã xác minh: 605 JSON trong `Metadata/`; 153 video từ 5 ZIP video
+   (49,02 GiB). Khi người dùng yêu cầu dừng, archive
+   `Video_N051-N060.zip` đang xử lý và có thêm 15 file đích, nâng tổng tạm thời
+   lên 168 video / 53,59 GiB. Tiến trình đã được dừng; ZIP nguồn vẫn còn nên
+   phần đang dở có thể làm lại an toàn.
+4. Sáu ZIP cũ còn nguyên: N051-N060, N061-N070, N071-N080, N081-N090,
+   N091-N100 và S01. Trong lúc giải nén, downloader đã hoàn tất thêm M05;
+   tại lần kiểm tra cuối có 7 ZIP hoàn chỉnh sẵn sàng giải nén và M06 đang tải.
+5. Đã sửa extractor để khi gặp file đích đang ghi dở (kích thước khác metadata
+   ZIP), nó chỉ xóa file đích chưa hoàn chỉnh rồi tạo lại từ ZIP nguồn.
+
 ## Git và kiểm chứng cuối phiên
 
 - Dữ liệu cũ Batch 1 giữ nguyên 100%, không bị ảnh hưởng.

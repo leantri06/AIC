@@ -37,3 +37,21 @@ Script `data/unzip_script.py` cũ dùng đường dẫn tương đối theo thư
 7. Chỉ chuyển app sang index ghép khi các kiểm tra đạt; giữ index cũ để quay lại. Cần triển khai/kiểm chứng hỗ trợ đường dẫn runtime ở bước đó.
 
 Việc chuẩn bị thư mục không có nghĩa pipeline ghép batch đã được triển khai hay kiểm thử.
+
+## Giải nén batch2
+
+Script `scripts/extract_batch2.py` chỉ đọc các file `.zip` đã tải xong và bỏ qua
+`.part`. Nó chuẩn hóa `videos/` thành `Videos/`, `media-info/` thành `Metadata/`,
+chặn path traversal, kiểm tra đủ file/kích thước và lưu tiến độ vào
+`data/batches/batch2/extracted/.extraction_state.json`.
+
+Do ổ D không đủ giữ đồng thời toàn bộ ZIP và bản giải nén, chạy chế độ xóa ZIP
+chỉ sau khi archive tương ứng đã được xác minh:
+
+```powershell
+& 'C:\Users\ADMIN\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' `
+  .\my-repo\scripts\extract_batch2.py --delete-archives-after-verify
+```
+
+Lệnh có thể chạy lại sau khi ngắt: archive đã xác minh được bỏ qua; file đích
+đang ghi dở sẽ được tạo lại từ ZIP nguồn. Không chạy hai tiến trình giải nén cùng lúc.
