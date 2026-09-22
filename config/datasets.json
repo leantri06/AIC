@@ -10,10 +10,13 @@
       "processed": "data/processed"
     },
     "batch2": {
-      "status": "awaiting_data",
+      "status": "downloading",
       "raw": "data/batches/batch2/raw",
       "extracted": "data/batches/batch2/extracted",
-      "processed": "data/batches/batch2/processed"
+      "processed": "data/batches/batch2/processed",
+      "total_expected_files": 18,
+      "total_expected_bytes": 228474855072,
+      "source": "https://docs.google.com/spreadsheets/d/1jXR0oUDc0zq1BFQLrcHrS1Dhl7seJgIMFL-1dlTxiXQ/edit?gid=0#gid=0"
     }
   },
   "combined_output": "data/combined",

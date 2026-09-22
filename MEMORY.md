@@ -1,6 +1,6 @@
 # Memory dự án — đọc đầu mỗi phiên
 
-Cập nhật: 2026-09-21 (Asia/Saigon).
+Cập nhật: 2026-09-22 (Asia/Saigon).
 
 ## Thỏa thuận với người dùng
 
@@ -52,10 +52,52 @@ Cập nhật: 2026-09-21 (Asia/Saigon).
 4. Kiểm tra truy vấn mẫu cả hai batch rồi mới chuyển app; giữ bộ cũ để rollback.
 5. Nếu cần thu hồi dung lượng ZIP/cache, đối chiếu dữ liệu trước khi xóa.
 
+## Tiếp nhận và tải Batch 2 (2026-09-21)
+
+1. Khảo sát liên kết Google Sheet và server BTC (`https://aic-data.ledo.io.vn/`):
+   - Tìm thấy 11 file ZIP video (tổng 145.97 GB) và 1 file `media-info-aic25-b2.zip` (~753 KB).
+   - Phát hiện Google Sheet bị trùng dòng N011-N020 và sót `Video_N031-N040.zip`, đã probe server và xác nhận file này tồn tại (10.17 GB).
+   - 9 phần Video tin tức vẫn đang ở trạng thái "Đang upload" trên sheet, chưa có link trên server.
+2. Viết script tải resumable `scripts/download_batch2.py` hỗ trợ:
+   - Tiếp tục tải khi bị ngắt qua HTTP Range header (`bytes=...-`).
+   - Cập nhật tiến độ live vào `data/batches/batch2/raw/progress.txt` và `download_status.json`.
+   - Kiểm tra tính toàn vẹn ZIP và đối chiếu kích thước sau khi tải xong từng file.
+   - Kiểm tra ngưỡng an toàn dung lượng ổ đĩa (tối thiểu 30 GB trống).
+   - Hỗ trợ cờ `--status` để xem dashboard trực tiếp.
+3. Khởi chạy tiến trình tải ngầm 12 file vào `data/batches/batch2/raw/`. File `media-info-aic25-b2.zip` đã hoàn thành và kiểm tra hợp lệ. File `Video_N001-N010.zip` đang tải với tốc độ ~18-19 MB/s.
+4. Cập nhật `config/datasets.json` phản ánh trạng thái tải của Batch 2.
+
+## Việc tiếp theo
+
+1. Giám sát quá trình tải toàn bộ 12 file Batch 2 cho đến khi hoàn tất.
+2. Theo dõi khi BTC cập nhật 9 phần video tin tức còn lại.
+3. Khi tải xong ZIP, kiểm tra cấu trúc bên trong trước khi giải nén vào `data/batches/batch2/extracted/`.
+4. Tạo index riêng `data/batches/batch2/processed/` và ghép vào `data/combined/` theo quy trình trong `docs/WORKSPACE.md`.
+
+## Cập nhật Batch 2 ngày 2026-09-22
+
+1. Người dùng cung cấp Google Sheet chính thức của batch2:
+   `https://docs.google.com/spreadsheets/d/1jXR0oUDc0zq1BFQLrcHrS1Dhl7seJgIMFL-1dlTxiXQ/edit?gid=0#gid=0`.
+2. Đã đọc tab `batch2` và đối chiếu với thư mục raw. 12 file cũ đã tải đủ và hợp lệ. Sheet mới bổ sung 6 file video tin tức `Videos_M05.zip` đến `Videos_M10.zip`; các dòng tương ứng M01-M04 vẫn chưa có filename/link.
+3. Kích thước được xác nhận bằng HTTP Range trực tiếp từ server:
+   - M05: 10.161.147.478 byte
+   - M06: 10.889.052.849 byte
+   - M07: 11.840.337.561 byte
+   - M08: 12.632.959.226 byte
+   - M09: 13.294.614.361 byte
+   - M10: 12.918.192.698 byte
+   - Tổng mới: 71.736.304.173 byte (~66,8 GiB); tổng inventory hiện tại: 18 file, 228.474.855.072 byte.
+4. Đã cập nhật `scripts/download_batch2.py` và `config/datasets.json`; sửa bộ đếm để các file có sẵn vẫn được tính là hoàn thành và bỏ hard-code thông báo 12 file.
+5. Đã chạy kiểm tra cú pháp Python. Downloader nền PID 9556 bắt đầu lúc 19:46:35, đang tải `Videos_M05.zip` vào `data/batches/batch2/raw/`; cơ chế resume và kiểm tra ZIP vẫn hoạt động. Dữ liệu batch1 không thay đổi.
+
+### Bước tiếp theo sau phiên này
+
+1. Kiểm tra `python scripts/download_batch2.py --status`. Nếu tiến trình bị ngắt, chạy lại script để resume; không xóa file `.part`.
+2. Sau khi đủ 18/18, chạy lại downloader bản mới một lần để xác nhận trạng thái và ZIP, rồi cập nhật memory thành hoàn tất.
+3. Theo dõi sheet cho M01-M04 và các gói Keyframes/map/objects/CLIP; chưa thể tạo index batch2 chỉ từ video và metadata hiện có.
+
 ## Git và kiểm chứng cuối phiên
 
-- Các kiểm tra dữ liệu/move ở trên đã đạt, ngoài phát hiện khóa trùng được ghi rõ.
-- Không thay đổi code runtime nên không chạy model/app hay test suite trong đợt dọn này.
-- Commit `e3599a0` đã push thành công lên `origin/main` ngày 2026-09-21 (Git báo `5e7efbf..e3599a0 main -> main`). Bản cập nhật nhật ký này được lưu bằng commit tiếp theo; dùng `git status -sb` và `git log -2 --oneline` để xác nhận trạng thái mới nhất.
-- Git sandbox báo ownership khác người dùng; dùng `git -c safe.directory=D:/bachkhoa/ai_challenge/my-repo ...` theo từng lệnh, không đổi global config.
-- Python `.venv` cần quyền ngoài sandbox (uv trampoline bị permission denied trong sandbox).
+- Dữ liệu cũ Batch 1 giữ nguyên 100%, không bị ảnh hưởng.
+- File dữ liệu đang tải nằm ngoài Git (`data/batches/batch2/raw/`).
+- File mới trong Git: `scripts/download_batch2.py`, cập nhật `config/datasets.json` và `MEMORY.md`.

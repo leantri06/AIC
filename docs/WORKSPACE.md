@@ -2,6 +2,8 @@
 
 Gốc máy hiện tại: `D:\bachkhoa\ai_challenge`. Git repository: `my-repo`, remote `https://github.com/leantri06/AIC.git`.
 
+Nguồn danh sách batch2: `https://docs.google.com/spreadsheets/d/1jXR0oUDc0zq1BFQLrcHrS1Dhl7seJgIMFL-1dlTxiXQ/edit?gid=0#gid=0`.
+
 | Đường dẫn từ workspace | Mục đích |
 | --- | --- |
 | `my-repo/` | Mã nguồn, test, tài liệu, MEMORY và cấu hình inventory |
