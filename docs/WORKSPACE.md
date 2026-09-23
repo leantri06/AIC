@@ -55,3 +55,22 @@ chỉ sau khi archive tương ứng đã được xác minh:
 
 Lệnh có thể chạy lại sau khi ngắt: archive đã xác minh được bỏ qua; file đích
 đang ghi dở sẽ được tạo lại từ ZIP nguồn. Không chạy hai tiến trình giải nén cùng lúc.
+
+## Trạng thái bố trí Batch 2 (2026-09-23)
+
+Batch 2 đã nằm gọn tại `data/batches/batch2/extracted/`, tách biệt hoàn toàn
+với Batch 1. Tất cả video nằm phẳng trong `Videos/`; tên và container nguồn
+được giữ nguyên để tránh phá tham chiếu: `Mxx`/`S01` là `.mp4`, `Nxxx` là
+`.mov`, và nguồn dùng cả dấu gạch dưới lẫn gạch nối. Audit quét
+`Videos/*.{mp4,mov}`; `Metadata/` cũng giữ nguyên cấu trúc nguồn.
+
+Kiểm kê đã xác nhận 495 video, 228.473.998.977 byte và 605 JSON metadata,
+không có ID video trùng hay tên sai định dạng. Chạy lại sau mỗi đợt bổ sung:
+
+```powershell
+python .\my-repo\scripts\audit_batch2.py --write
+```
+
+Lệnh này chỉ tạo/cập nhật `inventory.json` cạnh dữ liệu, không sửa video hay
+metadata. Batch 2 vẫn chưa có keyframe, ASR, embedding hoặc index nên chưa
+được ghép vào `data/combined/` và app vẫn dùng Batch 1.

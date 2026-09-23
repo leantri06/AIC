@@ -121,3 +121,24 @@ Cập nhật: 2026-09-22 (Asia/Saigon).
 - Dữ liệu cũ Batch 1 giữ nguyên 100%, không bị ảnh hưởng.
 - File dữ liệu đang tải nằm ngoài Git (`data/batches/batch2/raw/`).
 - File mới trong Git: `scripts/download_batch2.py`, cập nhật `config/datasets.json` và `MEMORY.md`.
+
+## Hoàn tất bố trí Batch 2 ngày 2026-09-23
+
+1. Toàn bộ dữ liệu đã tải nằm trong vùng riêng `data/batches/batch2/`; không
+   đụng tới Batch 1. `raw/` trống vì các ZIP đã được xóa sau khi giải nén/xác
+   minh theo yêu cầu trước đó; `processed/` và `combined/` vẫn để trống.
+2. Cấu trúc dùng tiếp: `extracted/Videos/` (495 video: N là `.mov`, M/S là
+   `.mp4`) và `extracted/Metadata/` (605 JSON). Giữ tên nguồn, kể cả hai kiểu
+   phân cách `_`/`-`, để không phá mapping tương lai.
+3. Thêm `scripts/audit_batch2.py`, chạy thành công với `--write`. Nó tạo
+   `data/batches/batch2/extracted/inventory.json` (bị Git ignore) và xác nhận
+   495 video, 228.473.998.977 byte, 605 JSON, ID duy nhất và tên hợp lệ.
+4. `config/datasets.json` đã chuyển Batch 2 sang `extracted_and_audited`; tài
+   liệu layout được cập nhật. Kiểm tra cú pháp cho downloader/extractor/auditor
+   đều đạt.
+
+### Việc tiếp theo
+
+1. Chờ BTC cung cấp keyframe, map-keyframes, objects/ASR/feature tương ứng
+   hoặc sinh chúng bằng pipeline cùng model Batch 1.
+2. Tạo index Batch 2 riêng rồi kiểm chứng trước khi ghép sang `data/combined/`.

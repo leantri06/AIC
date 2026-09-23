@@ -10,12 +10,17 @@
       "processed": "data/processed"
     },
     "batch2": {
-      "status": "downloading",
+      "status": "extracted_and_audited",
       "raw": "data/batches/batch2/raw",
       "extracted": "data/batches/batch2/extracted",
       "processed": "data/batches/batch2/processed",
       "total_expected_files": 18,
       "total_expected_bytes": 228474855072,
+      "extracted_video_count": 495,
+      "extracted_video_bytes": 228473998977,
+      "extracted_metadata_count": 605,
+      "inventory": "data/batches/batch2/extracted/inventory.json",
+      "audit_command": "python scripts/audit_batch2.py --write",
       "source": "https://docs.google.com/spreadsheets/d/1jXR0oUDc0zq1BFQLrcHrS1Dhl7seJgIMFL-1dlTxiXQ/edit?gid=0#gid=0"
     }
   },
