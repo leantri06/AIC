@@ -1,6 +1,6 @@
 # Memory dự án — đọc đầu mỗi phiên
 
-Cập nhật: 2026-09-22 (Asia/Saigon).
+Cập nhật: 2026-09-23 (Asia/Saigon).
 
 ## Thỏa thuận với người dùng
 
@@ -142,3 +142,24 @@ Cập nhật: 2026-09-22 (Asia/Saigon).
 1. Chờ BTC cung cấp keyframe, map-keyframes, objects/ASR/feature tương ứng
    hoặc sinh chúng bằng pipeline cùng model Batch 1.
 2. Tạo index Batch 2 riêng rồi kiểm chứng trước khi ghép sang `data/combined/`.
+
+## Hướng dẫn CPU keyframe 2026-09-23
+
+- Người dùng xác nhận BTC không cấp keyframe Batch 2, yêu cầu hướng dẫn tự
+  trích bằng CPU desktop. Thêm `scripts/extract_keyframes_cpu.py` và tài liệu
+  `docs/CPU_KEYFRAMES.md`; chưa chạy toàn bộ dữ liệu hay benchmark video thật.
+- PyAV, NumPy, Pillow có sẵn trong `.venv`. Trong sandbox Python trampoline
+  bị access denied; kiểm tra/thử nghiệm chạy được sau escalation.
+- Script dùng CPU decode tuần tự với 4 luồng, khảo sát 2 FPS, lọc chênh lệch RGB,
+  giữ ảnh định kỳ 4 giây, frame đầu/cuối, ảnh rộng tối đa 1280/JPEG90. Có lock,
+  reserve 30 GiB, kiểm tra JPEG, CSV và marker nguyên tử, resume cấp video.
+  Video dở được chạy lại từ đầu. Đổi nguồn/cấu hình phải đổi output root.
+- CSV ghi frame_idx 0-based từ thứ tự decode, pts_time từ PTS tương đối frame
+  đầu; source_pts_time giữ PTS nguồn. Không suy timestamp từ average FPS.
+- Test synthetic VFR/resume/config mismatch đạt: 1 passed. Chế độ --list
+  xác nhận M05_V001, N001-V001, S01-V001. Chưa kiểm chứng retrieval Batch 2.
+- Ước tính 24–48 giờ/20–60 GB trước đây chưa đo; không dùng làm cam kết.
+  Bước tiếp theo: người dùng chạy thử 3 nhóm, xem chất lượng và thời gian rồi
+  chạy toàn bộ; sau đó embedding/index riêng bằng model đồng nhất Batch 1.
+- Push commit f6190f4 ở đầu phiên bị auto-review từ chối vì xuất mã/tài liệu
+  tới GitHub chưa được chấp thuận theo đánh giá đó; chưa có xác nhận mới.

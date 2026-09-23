@@ -74,3 +74,6 @@ python .\my-repo\scripts\audit_batch2.py --write
 Lệnh này chỉ tạo/cập nhật `inventory.json` cạnh dữ liệu, không sửa video hay
 metadata. Batch 2 vẫn chưa có keyframe, ASR, embedding hoặc index nên chưa
 được ghép vào `data/combined/` và app vẫn dùng Batch 1.
+
+Hướng dẫn tự trích keyframe bằng CPU (BTC không cấp keyframe Batch 2):
+[CPU_KEYFRAMES.md](CPU_KEYFRAMES.md). Script đã chuẩn bị, chưa chạy toàn bộ video.
