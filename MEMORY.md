@@ -166,3 +166,21 @@ Cập nhật: 2026-09-23 (Asia/Saigon).
 - Đã đo thử `M05_V001`: 25.645 frame giải mã, giữ 1.005 keyframe cho
   1.025,76 giây video; chạy 68,594 giây và tạo 159.510.418 byte ảnh. Chưa đo
   mẫu nhóm N/S và chưa chạy toàn bộ 495 video.
+
+## Benchmark TransNet V2 ngày 2026-09-23
+
+- Người dùng yêu cầu chạy thử một video. Xác nhận máy i5-10400F (6C/12T),
+  GTX 1070 8 GiB, torch 2.5.1+cu121/CUDA hoạt động, av 18.1.0.
+- Thêm `scripts/benchmark_transnetv2.py`, tài liệu `docs/TRANSNET_BENCHMARK.md`.
+  Architecture upstream pin 85cef72, weights chuyển đổi PyTorch từ cộng đồng
+  magnusdtd/TransNetV2 pin c90da43; ghi SHA256, nạp weights_only + strict.
+  Model/cache nằm ngoài Git; video xử lý hoàn toàn local.
+- M05_V001 (1.025,76s, 25.645 frame): setup 6,21s; decode/resize 258,84s;
+  GPU inference FP32 19,20s; xuất JPEG 66,49s; tổng xử lý 344,53s.
+  264 shot, 458 keyframe, 71.941.098 byte. Output riêng trong
+  `data/batches/batch2/benchmarks/transnetv2-M05_V001-20260923/`.
+- Máy đồng thời đang chạy extractor CPU toàn bộ do người dùng khởi chạy
+  trước (PID 3096, --threads 4); không dừng/sửa tiến trình đó. Benchmark bị
+  chia sẻ CPU/disk nên không so trực tiếp với mẫu CPU 68,594s lúc trước.
+- Không chạy toàn bộ bằng TransNet. Chưa đánh giá chất lượng ranh giới shot,
+  recall tìm kiếm hoặc numerical parity của weights với TensorFlow gốc.
