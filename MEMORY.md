@@ -161,5 +161,8 @@ Cập nhật: 2026-09-23 (Asia/Saigon).
 - Ước tính 24–48 giờ/20–60 GB trước đây chưa đo; không dùng làm cam kết.
   Bước tiếp theo: người dùng chạy thử 3 nhóm, xem chất lượng và thời gian rồi
   chạy toàn bộ; sau đó embedding/index riêng bằng model đồng nhất Batch 1.
-- Push commit f6190f4 ở đầu phiên bị auto-review từ chối vì xuất mã/tài liệu
-  tới GitHub chưa được chấp thuận theo đánh giá đó; chưa có xác nhận mới.
+- Hai commit `f6190f4` và `afb169e` đã push thành công lên `origin/main`
+  ngày 2026-09-23 (`9b8666c..afb169e`).
+- Đã đo thử `M05_V001`: 25.645 frame giải mã, giữ 1.005 keyframe cho
+  1.025,76 giây video; chạy 68,594 giây và tạo 159.510.418 byte ảnh. Chưa đo
+  mẫu nhóm N/S và chưa chạy toàn bộ 495 video.
