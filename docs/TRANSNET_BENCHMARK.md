@@ -62,3 +62,42 @@ Script CPU cũ trên cùng video: 68,594 giây, 1.005 ảnh, 159.510.418 byte;
 khác chính sách chọn ảnh và điều kiện tải máy nên không dùng để kết luận
 TransNet chậm hơn chính xác 5 lần hoặc cho chất lượng tốt hơn. Chưa benchmark
 N/S, chưa ngoại suy toàn bộ 495 video.
+
+## Chạy batch có resume
+
+`scripts/run_transnetv2_batch.py` gọi pipeline đã benchmark cho từng video,
+giữ output TransNet riêng tại `data/batches/batch2/transnetv2/`. Mỗi video
+được ghi trong `partial/`, chỉ chuyển nguyên thư mục sang `completed/` sau khi
+có report thành công. Chạy lại tự kiểm tra và bỏ qua video đã hoàn tất. Output
+lỗi được giữ trong `failed/` để điều tra; script không tự xóa dữ liệu.
+
+Chạy thử ba nhóm trước:
+
+```powershell
+cd D:\bachkhoa\ai_challenge\my-repo
+& .\.venv\Scripts\python.exe -u .\scripts\run_transnetv2_batch.py `
+  --video-id M05_V001 --video-id N001-V001 --video-id S01-V001
+```
+
+Sau khi xem ảnh và dung lượng, chạy toàn bộ:
+
+```powershell
+& .\.venv\Scripts\python.exe -u .\scripts\run_transnetv2_batch.py
+```
+
+Nhấn Ctrl+C một lần để dừng. Video đang chạy giữ trong `partial/`; lần sau tạo
+partial mới và xử lý lại video đó, còn video trong `completed/` được bỏ qua.
+Các partial cũ không được tự dọn. Không chạy hai batch cùng output; có OS lock.
+Runner nạp model lại cho mỗi video (khoảng 6 giây trong mẫu), đơn giản và cô
+lập lỗi nhưng thêm overhead. Pipeline hiện buffer toàn bộ frame 48x27 của một
+video trong RAM và decode video hai lượt; theo dõi RAM với video S01 dài.
+
+Trước khi chạy, xác nhận cache tồn tại:
+
+```powershell
+Get-FileHash ..\data\.cache\transnetv2\transnetv2_pytorch.py
+Get-FileHash ..\data\.cache\transnetv2\transnetv2-pytorch-weights.pth
+```
+
+Hash mong đợi được ghi ở phần đầu tài liệu này. Nếu cache mất, không chạy với
+file ngẫu nhiên cùng tên; tải lại đúng revision đã pin và đối chiếu SHA256.

@@ -184,3 +184,18 @@ Cập nhật: 2026-09-23 (Asia/Saigon).
   chia sẻ CPU/disk nên không so trực tiếp với mẫu CPU 68,594s lúc trước.
 - Không chạy toàn bộ bằng TransNet. Chưa đánh giá chất lượng ranh giới shot,
   recall tìm kiếm hoặc numerical parity của weights với TensorFlow gốc.
+
+## Audit sau lần chạy CPU toàn bộ 2026-09-23
+
+- Người dùng báo đã trích xong nhưng audit thấy 495 thư mục ảnh, chỉ 222 CSV
+  và 222 report hoàn tất, tổng 667.859 JPG; `keyframe-last-run.json` có 273
+  failures. Không được dùng các thư mục dở để embedding.
+- Phần lớn `.mov` decode tới EOS nhưng container khai báo dư frame (thường 1,
+  đôi khi nhiều); M08_V001 có PTS đi lùi. Sửa extractor: EOS decoder là số
+  frame thực tế, ghi delta/cảnh báo; PTS thô giữ ở source_pts_time và timeline
+  tương đối được làm đơn điệu, có bộ đếm corrections. Video dở có owner marker
+  được dọn riêng JPG sinh bởi script trước khi chạy lại.
+- Test VFR/resume đạt. Chạy bù đại diện đạt: M08_V001 1.653 ảnh/130,9s;
+  N001-V001 325 ảnh/45,3s, decoded 14.649 so với declared 14.650 và được ghi
+  cảnh báo. Sau hai video có 224/495 report+CSV hoàn chỉnh; cần chạy lại lệnh
+  toàn bộ để skip video hoàn tất và xử lý 271 video còn lại. Chưa embedding.

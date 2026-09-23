@@ -57,6 +57,12 @@ def extract(video, root, settings, threads, reserve_gib):
     if images.exists():
         if not owner.exists() or json.loads(owner.read_text()) != ownership:
             raise RuntimeError('Existing output not owned by this run; use a new --output-root.')
+        # There is no completion report, so these are generated remnants from
+        # an interrupted/failed attempt. Delete only files covered by our owner marker.
+        for generated in images.glob('*.jpg'):
+            generated.unlink()
+        for generated in images.glob('*.jpg.tmp'):
+            generated.unlink()
     else:
         images.mkdir()
         atomic_json(owner, ownership)
@@ -65,6 +71,8 @@ def extract(video, root, settings, threads, reserve_gib):
     previous_small = None
     previous_kept_time = -math.inf
     previous_time = -math.inf
+    previous_raw_time = -math.inf
+    timeline_corrections = 0
     origin = None
     next_sample = 0.0
     decoded = 0
@@ -98,9 +106,16 @@ def extract(video, root, settings, threads, reserve_gib):
             pts_seconds = float(frame.time)
             if origin is None:
                 origin = pts_seconds
-            elapsed = pts_seconds - origin
-            if elapsed < previous_time:
-                raise RuntimeError('Non-monotonic PTS.')
+            raw_elapsed = pts_seconds - origin
+            if raw_elapsed < previous_raw_time:
+                timeline_corrections += 1
+            previous_raw_time = raw_elapsed
+            # Some official MP4/MOV files contain backward PTS or edit-list
+            # discontinuities. Keep the original PTS in source_pts_time while
+            # deriving a monotonic relative timeline for sampling and UI.
+            minimum_step = (1.0 / fps) if fps > 0 else 0.0
+            elapsed = (raw_elapsed if raw_elapsed >= previous_time
+                       else previous_time + minimum_step)
             previous_time = elapsed
             decoded += 1
             last_frame = (frame, index, elapsed, pts_seconds)
@@ -123,7 +138,8 @@ def extract(video, root, settings, threads, reserve_gib):
         if last_frame is None:
             raise RuntimeError('Video decoded zero frames.')
         if declared_frames and decoded != declared_frames:
-            raise RuntimeError(f'Decoded {decoded}, container declares {declared_frames}; inspect source.')
+            print(f'WARN {video.stem}: decoded {decoded}, container declares '
+                  f'{declared_frames}; decoder EOS is authoritative', flush=True)
         if not rows or rows[-1]['frame_idx'] != last_frame[1]:
             frame, index, elapsed, pts_seconds = last_frame
             keep(frame, index, elapsed, fps, pts_seconds)
@@ -147,6 +163,9 @@ def extract(video, root, settings, threads, reserve_gib):
               'elapsed_seconds': round(time.monotonic() - started, 3),
               'image_bytes': sum((images / name).stat().st_size for name in expected),
               'timestamp_origin': origin, 'av_version': av.__version__}
+    report['declared_frames'] = declared_frames
+    report['declared_frame_delta'] = decoded - declared_frames if declared_frames else None
+    report['timeline_corrections'] = timeline_corrections
     atomic_json(done, report)
     print(f'DONE {video.stem}: {len(rows)} images in {report["elapsed_seconds"]:.1f}s', flush=True)
 

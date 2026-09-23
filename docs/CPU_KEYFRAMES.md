@@ -71,10 +71,19 @@ Nhấn Ctrl+C một lần trong PowerShell, đợi script thoát, sau đó chạ
 lệnh. Video hoàn tất được bỏ qua; video đang dở chạy lại từ đầu và ghi lại các
 ảnh do chính script tạo với cùng nguồn/cấu hình. Resume không lưu vị trí frame
 giữa video. Marker hoàn tất chỉ được ghi sau decode, kiểm tra JPEG và lưu CSV.
-Nếu mất điện, video dở cũng được xử lý lại.
+Nếu mất điện, video dở cũng được xử lý lại. Trước khi làm lại, script xác minh
+`.owner.json` khớp chính xác nguồn/cấu hình rồi xóa riêng `.jpg` dở do chính
+script tạo trong thư mục video đó; thư mục thiếu marker hoặc marker lệch sẽ bị
+từ chối thay vì bị sửa.
 
 `ERROR` nghĩa video đó chưa hoàn tất; xem `keyframe-last-run.json`. Sau khi xử
 lý nguyên nhân, chạy lại. Không coi chỉ có thư mục ảnh là đã xong.
+
+Một số `.mov` Batch 2 khai báo số frame trong container nhiều hơn số frame
+decoder trả về khi đến EOS; đây được ghi thành `declared_frame_delta` và cảnh
+báo, không còn làm video thất bại. Nếu PTS nguồn đi lùi, script giữ PTS thô ở
+`source_pts_time` và hiệu chỉnh timeline tương đối tăng đều; số lần hiệu chỉnh
+nằm trong `timeline_corrections`.
 
 ## Thử cấu hình khác
 
