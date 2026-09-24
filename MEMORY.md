@@ -199,3 +199,19 @@ Cập nhật: 2026-09-23 (Asia/Saigon).
   N001-V001 325 ảnh/45,3s, decoded 14.649 so với declared 14.650 và được ghi
   cảnh báo. Sau hai video có 224/495 report+CSV hoàn chỉnh; cần chạy lại lệnh
   toàn bộ để skip video hoàn tất và xử lý 271 video còn lại. Chưa embedding.
+
+## Hoàn tất keyframe CPU và nguồn chính thức mới ngày 2026-09-24
+
+- Lần chạy tiếp tục đã hoàn tất đủ 495/495 video: 495 report, 495 CSV map,
+  670.151 JPG (112.653.200.707 byte) và `keyframe-last-run.json` không có lỗi.
+  Không chạy lại extractor; chưa dùng output này để embedding/index.
+- Google Sheet Batch 2 đã bổ sung các gói chính thức: keyframe cho S01, N001-N100
+  và M01-M10; `aic26-b2-clip-features.zip`, `aic26-b2-map-keyframes.zip`, cùng
+  Objects cho M01-M10, N001-N100 và S01. Đây là thay đổi quan trọng so với lần
+  kiểm tra trước.
+- Ghi chú chính thức: video N001-N100 dùng VFR nên `frame_idx` trong map chỉ
+  tương đối; task KIS/QA có thể nộp millisecond (`pts_time * 1000`), TRAKE không
+  dùng dữ liệu này.
+- Việc tiếp theo cần người dùng quyết định: ưu tiên tải và kiểm chứng keyframe,
+  map, CLIP và Objects chính thức, hay giữ bộ keyframe CPU local làm phương án
+  bổ sung. Không tự tải các gói mới hoặc chạy embedding trước quyết định đó.
