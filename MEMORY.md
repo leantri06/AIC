@@ -296,3 +296,47 @@ Cập nhật: 2026-09-24 (Asia/Saigon).
 - Dữ liệu camera có giới hạn phân phối từ BTC; không công khai Dataset hoặc
   Notebook chứa dữ liệu. Cần xác minh quyền dùng cloud theo quy định BTC
   trước khi chuyển dữ liệu. Chưa upload bất kỳ dữ liệu nào.
+
+## Triển khai bộ Kaggle T4 x2 ngày 2026-09-24
+
+- Người dùng yêu cầu thực hiện và chọn tự import notebook, thêm private
+  dataset bằng tài khoản Kaggle có GPU. Không có cấu hình Kaggle API local;
+  chưa upload/chạy Kaggle, không có benchmark T4 thực tế trong phiên này.
+- Đã tạo `kaggle/batch2_siglip2_t4x2.ipynb`, runner độc lập
+  `kaggle/siglip2_runner.py`, packer `scripts/prepare_kaggle_batch2.py`,
+  merger `scripts/merge_kaggle_batch2.py`, launcher .bat và hướng dẫn
+  `docs/KAGGLE_BATCH2.md`. Inventory ghi nhận keyframe_source=cpu và sample
+  local đã kiểm chứng, Kaggle chưa chạy.
+- Notebook mặc định benchmark; mỗi GPU một process/image tower, chia shard
+  theo số ảnh, FP16 inference/L2 float32, pin checkpoint SHA256/revision.
+  Kiểm chứng 6 vector batch1 trên mỗi GPU, cosine >=0.999 rồi mới chạy.
+  Dataset ảnh đọc trực tiếp từ ZIP_STORED đuôi .aicshard, không giải nén
+  toàn bộ. JPEG giữ nguyên byte. Record portable giữ frame_idx và hai PTS.
+- Resume qua output các phiên: xác minh input/mapping hash, cấu hình, norm
+  và shape; ghi npz nguyên tử. Thời gian full mặc định 9,5h; người dùng
+  Save Version/Run All rồi Add Input toàn bộ output cũ cùng catalog. Không
+  tự upload output; file trong phiên interactive chưa lưu không bền vững.
+- Merger từ chối catalog sample/thiếu shard/config khác/khóa trùng; tạo
+  index batch2 mới với đường dẫn local, chưa ghép batch1 hay chuyển app.
+- 35 test đạt: giữ JPEG/mapping, corruption, chia tải, resume khác config,
+  merge đường dẫn/thứ tự, notebook compile và test ingestion/submission cũ.
+- Smoke GPU local thực: 4 ảnh + 6 parity, FP16 GTX1070; cosine min
+  0,9999899. Spawn worker, ghi/đọc output thành công. Resume sang thư mục
+  output mới với --resume-root bỏ qua đúng shard, frames=0. Chưa thể test
+  hai GPU thật trên máy chỉ có một GPU; notebook assert đủ 2 GPU khi chạy.
+- Gói benchmark HOÀN TẤT tại data/batches/batch2/kaggle-sample/: 2.354 ảnh,
+  3 shard, 373.005.447 byte; control có catalog/parity/runner. User tạo hai
+  private datasets từ nội dung control/ và images-000/, import ipynb.
+- Bộ FULL ĐANG ĐÓNG GÓI tại data/batches/batch2/kaggle-full/. Đã khởi chạy
+  Python nền qua exec session 76162, process Python thực PID 4388, trampoline
+  PID 5916 (19:43:08 local). Đổi sang ghi ZIP tuần tự có buffer 64MiB; giữ
+  shard cũ và resume sau khi dừng phiên pack trước PID10788. Lần kiểm tra
+  cuối: 39 shard, 46.924 ảnh, 6,721 GiB, catalog_ready=false; KHÔNG coi full
+  là hoàn tất. Không khởi chạy thêm packer khi PID4388 còn chạy.
+- Xem tiến độ: `.venv/Scripts/python.exe scripts/prepare_kaggle_batch2.py
+  --output ../data/batches/batch2/kaggle-full --status`. Catalog full chỉ được
+  ghi khi đóng gói xong. Nếu process bị ngắt, chạy lại cùng lệnh không có
+  --status (hoặc scripts/prepare_kaggle_full.bat); source không bị thay đổi.
+- Việc tiếp theo: người dùng benchmark gói sample trên Kaggle; kiểm tra
+  pack full hoàn tất; thay sample/control/output sample bằng bộ full, chạy
+  theo quota và persist từng version. Giữ toàn bộ output để tải/merge local.

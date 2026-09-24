@@ -11,6 +11,11 @@
     },
     "batch2": {
       "status": "extracted_and_audited",
+      "keyframe_source": "cpu",
+      "keyframe_count": 670151,
+      "embedding_status": "local_sample_verified_kaggle_not_run",
+      "kaggle_sample": "data/batches/batch2/kaggle-sample",
+      "kaggle_full_package": "data/batches/batch2/kaggle-full",
       "raw": "data/batches/batch2/raw",
       "extracted": "data/batches/batch2/extracted",
       "processed": "data/batches/batch2/processed",
