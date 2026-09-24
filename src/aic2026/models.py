@@ -22,6 +22,10 @@ class FrameRecord(BaseModel):
     video_id: str
     frame_id: int
     keyframe_path: str
+    # CPU extractor timeline (seconds); raw source PTS is preserved separately.
+    # Neither field implies a submission timestamp convention.
+    pts_time: float | None = None
+    source_pts_time: float | None = None
     object_labels: list[str] = Field(default_factory=list)
     # Deprecated: prefer VideoMetadataStore.get(video_id).metadata_keywords.
     # Kept as defaults so legacy manifests still validate; new code should not

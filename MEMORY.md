@@ -241,3 +241,36 @@ Cập nhật: 2026-09-24 (Asia/Saigon).
 - Việc tiếp theo cần người dùng quyết định: ưu tiên tải và kiểm chứng keyframe,
   map, CLIP và Objects chính thức, hay giữ bộ keyframe CPU local làm phương án
   bổ sung. Không tự tải các gói mới hoặc chạy embedding trước quyết định đó.
+
+## Thử embedding CPU keyframe theo yêu cầu 2026-09-24
+
+- Người dùng yêu cầu làm thử bước tiếp theo và hỏi “transformer = slow”.
+  Đã chạy thử giới hạn trên keyframe CPU local, không tải gói BTC mới,
+  không khởi chạy toàn bộ hay đổi app/index. Quyết định bộ dữ liệu dùng cho
+  lần chạy toàn bộ vẫn chưa chốt.
+- Làm rõ nhận định mapping trước: extractor CPU đặt tên JPEG bằng frame_idx
+  thật (không phải n). Thêm reader riêng `ingestion/cpu_keyframes.py` để tránh
+  ánh xạ hai lần; kiểm tra owner/report, video source stat, map/ảnh, thứ tự
+  frame, timestamp. Hỗ trợ .mov/.mp4, giữ nguyên ID. Không sửa reader BTC cũ.
+- FrameRecord có thêm pts_time và source_pts_time tùy chọn, giữ tương thích
+  manifest cũ. Quy ước timestamp VFR khi nộp chưa được xác minh trong đợt này.
+- Audit reader mới đạt toàn bộ 495 video, 670.151 ảnh. Chỉ kiểm tra cấu trúc,
+  mapping và stat, không giải mã lại toàn bộ JPEG hoặc video.
+- Thêm `scripts/benchmark_batch2_embeddings.py`, tài liệu
+  `docs/BATCH2_EMBEDDING_TRIAL.md` và test. 24 test liên quan đạt.
+- Thử 48 ảnh (16 ảnh rải đều/video M05_V001, N001-V001, S01-V001), FP32,
+  L2, OpenCLIP SigLIP2 SO400M-14-378/webli từ cache, snapshot 93e0e6a.
+  Batch size 2: 16,579s, 2,895 ảnh/s, peak allocated 1,700 GiB.
+  Batch size 8: 16,289s, 2,947 ảnh/s, peak allocated 1,924 GiB.
+  Cả hai tạo ma trận 48x1152 hữu hạn, norm xấp xỉ 1. Report đầy đủ cùng
+  SHA256/preprocess nằm trong data/batches/batch2/benchmarks/
+  siglip2-cpu-keyframes-20260924 và siglip2-cpu-keyframes-b8-20260924.
+- Tính lại 6 vector batch1 tại hàng 0,35464,70928,106392,141856,177320:
+  cosine 0,999948–0,999999, phù hợp trên mẫu; chưa chứng minh toàn bộ index
+  hoặc đánh giá retrieval. Ngoại suy tốc độ mẫu cho toàn bộ là ~63–64 giờ,
+  chưa tính overhead, không cam kết.
+- “Slow” có thể là use_fast=False của image processor/tokenizer HF. Bản
+  Transformers 5.14.1 ở máy chuyển image flag này thành backend="pil".
+  Pipeline thử dùng OpenCLIP/PIL bicubic 378x378 nên không gắn cờ HF này.
+- Việc còn lại: chọn CPU/BTC cho lần chạy đầy đủ, thêm pipeline resume theo
+  video, kiểm thử tìm kiếm và timestamp nộp VFR; chưa ghép batch1+batch2.
