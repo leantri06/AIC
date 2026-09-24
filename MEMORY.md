@@ -1,6 +1,6 @@
 # Memory dự án — đọc đầu mỗi phiên
 
-Cập nhật: 2026-09-23 (Asia/Saigon).
+Cập nhật: 2026-09-24 (Asia/Saigon).
 
 ## Thỏa thuận với người dùng
 
@@ -199,6 +199,32 @@ Cập nhật: 2026-09-23 (Asia/Saigon).
   N001-V001 325 ảnh/45,3s, decoded 14.649 so với declared 14.650 và được ghi
   cảnh báo. Sau hai video có 224/495 report+CSV hoàn chỉnh; cần chạy lại lệnh
   toàn bộ để skip video hoàn tất và xử lý 271 video còn lại. Chưa embedding.
+
+## Kiểm tra và đề xuất sau trích keyframe 2026-09-24
+
+- Đọc lại hai PDF trong `docs/reference/` ngoài repo. `AIC2026.pdf` hiện là
+  thông báo BTC ngày 21/9 về batch2 và tập huấn chung kết: dữ liệu chung kết
+  gồm cả hai batch. Thông báo nói dữ liệu bổ trợ sẽ gửi sau; chưa có thể lệ
+  chấm/nộp chung kết chi tiết trong hai file này. Không mặc định áp dụng quy
+  tắc top-100 của tài liệu sơ tuyển cho chung kết. Camera giao thông được
+  BTC giới hạn sử dụng trong cuộc thi, không phân phối lại.
+- `keyframe-last-run.json`: selected=495, failures=[]; đối chiếu từng video
+  có 495 report, 495 CSV và tổng 670.151 JPG. Số dòng CSV, JPG và kept_frames
+  khớp ở mọi video; không gặp frame_idx âm. Đây là kiểm tra cấu trúc/số lượng,
+  chưa giải mã lại toàn bộ JPEG hay xác minh chính xác từng mapping với video.
+- `batch2/processed/` và `data/combined/` vẫn trống. Chưa chạy embedding.
+- Phát hiện `ingestion/manifest.py::build_manifest` chưa đọc map-keyframes
+  CSV; lấy frame từ Metadata hoặc ordinal, và chỉ dò video `.mp4`. Phải bổ
+  sung mapping n -> frame_idx/pts_time và hỗ trợ `.mov` trước khi dùng cho
+  batch2. Giữ nguyên video ID nguồn và xác nhận quy ước frame khi nộp.
+- Thứ tự đề xuất: audit mapping/ảnh mẫu N/M/S; sửa và kiểm thử manifest;
+  xác nhận checkpoint/preprocess/normalization thực sự của vector batch1;
+  benchmark embedding GPU mẫu rồi chạy batch2 có resume; điều tra 614 khóa
+  trùng batch1 và va chạm liên batch; ghép index vào combined, kiểm tra app
+  và submission cả hai batch. Sau đó bổ sung ASR/OCR, BM25 và tinh chỉnh
+  khung hình quanh kết quả truy xuất để phục vụ Q&A/TRAKE.
+- Không đổi runtime hay dữ liệu trong phiên tư vấn này. Chưa kiểm tra online
+  xem BTC có phát hành thêm video/dữ liệu bổ trợ sau thông báo hay không.
 
 ## Hoàn tất keyframe CPU và nguồn chính thức mới ngày 2026-09-24
 
