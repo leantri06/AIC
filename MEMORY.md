@@ -340,3 +340,20 @@ Cập nhật: 2026-09-24 (Asia/Saigon).
 - Việc tiếp theo: người dùng benchmark gói sample trên Kaggle; kiểm tra
   pack full hoàn tất; thay sample/control/output sample bằng bộ full, chạy
   theo quota và persist từng version. Giữ toàn bộ output để tải/merge local.
+
+## Kiểm tra lỗi upload Kaggle 2026-09-25
+
+- Người dùng gửi ảnh lỗi UI `Failed to execute 'json' on 'Response':
+  Unexpected end of JSON input`, danh sách có shard S01-V012 và quota
+  hiển thị 119.19 GB / 214.75 GB. Chưa có HTTP status/response nên chưa xác
+  định lỗi mạng, phiên đăng nhập, backend hoặc giới hạn upload; không kết
+  luận JSON bên trong shard hỏng hay đuôi .aicshard bị từ chối.
+- Bộ full đã đóng gói XONG: catalog ngày 24/9 21:39; 495 video, 670.151 ảnh,
+  628 shard, 14 nhóm images-000..013, 112.880.513.115 byte. Đối chiếu mọi
+  file với catalog: đủ, kích thước khớp. Chưa rehash toàn bộ 112,88 GB.
+- Kiểm tra mẫu S01-V012-0016.aicshard trong ảnh: SHA256 khớp catalog và
+  ZipFile.testzip() không phát hiện CRC lỗi. Không sửa dữ liệu.
+- Đề xuất kiểm tra My Datasets ở tab khác trước khi upload lại để tránh
+  trùng khi create đã thành công; dùng từng nhóm ~8 GiB thay vì gom cả bộ
+  trong một lần, nếu vẫn lỗi lấy status/response request lỗi trong Network.
+  Không đề nghị xóa/reset upload lớn trước khi kiểm tra trạng thái máy chủ.
