@@ -274,3 +274,25 @@ Cập nhật: 2026-09-24 (Asia/Saigon).
   Pipeline thử dùng OpenCLIP/PIL bicubic 378x378 nên không gắn cờ HF này.
 - Việc còn lại: chọn CPU/BTC cho lần chạy đầy đủ, thêm pipeline resume theo
   video, kiểm thử tìm kiếm và timestamp nộp VFR; chưa ghép batch1+batch2.
+
+## Chốt keyframe CPU, xem xét Kaggle 2026-09-24
+
+- Người dùng đã CHỐT dùng keyframe CPU cho batch2, thay thế mục còn chờ
+  chọn CPU/BTC ở trên. Hỏi khả năng tăng tốc với Kaggle T4 x2; chưa yêu cầu
+  upload hoặc khởi chạy cloud trong lượt này.
+- T4 có Tensor Cores FP16; phương án đề xuất là hai process độc lập, mỗi
+  GPU giữ một image encoder, chia video cân theo số ảnh, dùng FP16 autocast
+  nhưng normalize/lưu float32 và kiểm chứng lại với vector batch1 FP32.
+  Script benchmark hiện tại chỉ dùng một GPU và FP32, không tự tận dụng x2.
+- Chưa đo T4 nên không cam kết số giờ. Với 670.151 ảnh, tổng throughput
+  giả định 20/40/60 ảnh/s tương ứng khoảng 9,31/4,65/3,10 giờ, chưa gồm I/O,
+  upload và setup. Cần benchmark vài nghìn ảnh trên cả hai GPU rồi ngoại suy.
+- Keyframe hiện ~112,65 GB; cân nhắc shard, chỉ chuyển ảnh/map và metadata
+  cần thiết, không cần video gốc cho embedding. Reader audit local hiện
+  yêu cầu video source stat, cần tách bước kiểm chứng/manifest portable khi
+  chuẩn bị pipeline Kaggle. Không tự resize/re-JPEG làm thay đổi preprocess.
+- Kaggle docs nêu phiên GPU tối đa 12h và quota GPU theo tài khoản; cần lưu
+  output bền vững theo shard và resume qua phiên, không chỉ ghi file tạm.
+- Dữ liệu camera có giới hạn phân phối từ BTC; không công khai Dataset hoặc
+  Notebook chứa dữ liệu. Cần xác minh quyền dùng cloud theo quy định BTC
+  trước khi chuyển dữ liệu. Chưa upload bất kỳ dữ liệu nào.
