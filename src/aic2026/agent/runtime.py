@@ -50,12 +50,6 @@ class RetrievalAgent:
         # vài nghìn video. 0 = xét hết (backward-compatible).
         self.coarse_top_k = 200
         self.trake_preferred_prefixes = trake_preferred_prefixes
-        # Bật dịch VI→EN tự động. Mặc định False (tắt) vì:
-        #  (1) người dùng có thể nhập sẵn tiếng Anh;
-        #  (2) dịch phụ thuộc Ollama — nếu fail thì gây ra frame sai;
-        #  (3) có query đòi giữ nguyên cụm từ gốc (tên riêng, chữ trên biển báo).
-        # Bật qua nút "Dịch VI→EN" trên UI hoặc tham số khi khởi tạo agent.
-        self.translate: bool = False
         # SigLIP2 visual retrieval only.
         self.search_mode: str = "siglip"
 
@@ -110,63 +104,7 @@ class RetrievalAgent:
         # Validate that the task type is supported.
         default_registry.handler_for(query.type)
 
-        # --- Translate Vietnamese → English (deterministic pipeline dropped the
-        # LLM planner that used to do this). Text inside brackets (…), […],
-        # {…}, and quotes is preserved verbatim (e.g. names / sign text).
-        #
-        # --- Translate Vietnamese → English (deterministic pipeline dropped the
-        # LLM planner that used to do this). Text inside brackets (…), […],
-        # {…}, and quotes is preserved verbatim (e.g. names / sign text).
-        from .translator import formulate_visual_facets, translate_query_fields
-
-        if self.translate:
-            use_llm = False
-            translated_text, translated_question, translated_events, translated_changed, translation_source = (
-                translate_query_fields(
-                    query.text,
-                    query.question,
-                    query.events,
-                    None,
-                    use_llm=False,
-                )
-            )
-            if translated_changed:
-                changes: dict[str, dict[str, str]] = {}
-                if translated_text != query.text:
-                    changes["text"] = {"from": query.text, "to": translated_text}
-                if (translated_question or "") != (query.question or ""):
-                    changes["question"] = {
-                        "from": query.question or "",
-                        "to": translated_question or "",
-                    }
-                for old_ev, new_ev in zip(query.events or [], translated_events):
-                    if old_ev != new_ev:
-                        changes.setdefault("events", []).append({"from": old_ev, "to": new_ev})
-
-                query = Query(
-                    query_id=query.query_id,
-                    type=query.type,
-                    text=translated_text,
-                    question=translated_question,
-                    events=translated_events,
-                )
-                trace = [
-                    AgentTrace(
-                        step="translate",
-                        detail=json.dumps(
-                            {
-                                "normalized": True,
-                                "source": translation_source,
-                                "changes": changes,
-                            },
-                            ensure_ascii=False,
-                        ),
-                    )
-                ]
-            else:
-                trace = []
-        else:
-            trace = []
+        trace: list[AgentTrace] = []
 
         # For QA, retrieval text combines context text and question keywords
         retrieval_text = query.text
@@ -178,15 +116,7 @@ class RetrievalAgent:
             elif not t_clean and q_clean:
                 retrieval_text = q_clean
 
-        # Tầng 1 & Tầng 2: Visual Query Formulation & GQE Multi-Facet Decomposition (cho KIS / Q&A)
-        if self.translate and query.type != "trake":
-            visual_facets = formulate_visual_facets(
-                retrieval_text,
-                llm=None,
-                use_llm=False,
-            )
-        else:
-            visual_facets = None
+        visual_facets = None
 
         if self.search_mode != "siglip":
             raise ValueError("Only SigLIP2 visual search is supported (mode='siglip').")

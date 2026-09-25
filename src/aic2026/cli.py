@@ -369,7 +369,6 @@ def agent_query(
     object_penalty_scale: float = typer.Option(2.0, help="KIS: hệ số phạt frame THIẾU vật thể so với thưởng frame có vật thể (mặc định 2.0)."),
     drop_empty_object_frames: bool = typer.Option(False, help="KIS: loại hẳn frame KHÔNG có vật thể nào (ảnh mờ, không entity đạt ngưỡng 0.4) khi query có hỏi vật thể. Giảm truy xuất đến frame nhiễu. Tắt nếu sợ mất recall."),
     trake_preferred_prefixes: str = typer.Option("", help="Ưu tiên (soft bias, KHÔNG loại trừ) TRAKE vào tiền tố video_id, cách nhau dấu phẩy (vd: L26). KIS/Q&A luôn xét TOÀN BỘ video. Để trống = mặc định ưu tiên L26. Truyền '.' để tắt ưu tiên."),
-    translate: bool = typer.Option(False, help="Dịch VI→EN trước khi retrieval (CLIP là tiếng Anh). Mặc định tắt: dùng query nguyên bản."),
     search_mode: str = typer.Option("siglip", "--mode", "-m", help="SigLIP2 visual search (siglip)"),
     clip_model: str = typer.Option("siglip2", help="Mô hình CLIP/SigLIP (ViT-SO400M-14-SigLIP2-378 / siglip2, ViT-SO400M-14-SigLIP-384 / siglip, ViT-B-16-SigLIP2-384 / siglip2-base, ViT-L-14)"),
     clip_pretrained: str = typer.Option("webli", help="Checkpoint (webli, openai, metaclip_fullcc, metaclip_400m, laion2b_s32b_b82k)"),
@@ -455,7 +454,6 @@ def agent_query(
         trake_preferred_prefixes=_parse_prefixes(trake_preferred_prefixes),
     )
     agent.coarse_top_k = coarse_top_k
-    agent.translate = translate
     agent.search_mode = search_mode
     result = agent.run(parsed_query)
     if parsed_query.type == "qa" and not any(c.answer for c in result.candidates):

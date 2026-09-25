@@ -419,3 +419,15 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 ### Chiến thuật thi đấu (khuyến nghị):
 - Gõ **3-5 từ khóa tiếng Anh** (không cần câu đầy đủ) → Search trong 0.2s → Quét Top 5 → Bấm **Copy ms** trên ảnh đúng → Dán vào App BTC → Nộp trong **< 45 giây** → Ăn điểm tối đa.
 - Bật **English Direct Mode** (bỏ tick "Dịch VI→EN") khi nhập tiếng Anh trực tiếp.
+
+## Rà soát tốc độ truy vấn 2026-09-25
+
+- Người dùng yêu cầu giảm ~30s xuống ~5s, sau đó yêu cầu bỏ dịch tiếng Việt.
+- Tách cache corpus/pipeline khỏi cache orchestrator: đổi task/NMS/coarse không đọc lại manifest + tính lại centroid. Benchmark xác nhận 1 cache miss, 3 hits khi đổi KIS/QA/TRAKE.
+- Bỏ dịch khỏi UI, CLI và đường chạy agent/API; dùng trực tiếp câu nhập. Module translator cũ chưa xóa vật lý.
+- Sửa warmup nuốt exception/báo thành công giả; bỏ cam kết VRAM/0.1s chưa đo. Thêm timing load/search/total vào trace và UI; bỏ forced gc mỗi query.
+- Sửa run_task bỏ qua coarse_top_k; sửa empty video filter thành không có kết quả thay vì tìm toàn corpus, xử lý k<=0 cho filtered search.
+- Máy đo thực: RTX 3050 Laptop 4 GiB, torch 2.11.0+cu128; matrix 1.832.099.456 bytes. Baseline cold 61,56s (cProfile), warm KIS 2,36s. Sau sửa warm KIS 1,27–1,61s; QA retrieval 1,26s; TRAKE 2 events/top200 1,67s. Cold khoảng 47–51s. Chưa đo UI end-to-end, p95 hoặc recall trên ground truth; không khẳng định đã tái hiện chính xác 30s người dùng gặp.
+- Kiểm chứng: compileall, git diff --check, regression trực tiếp NumPy cho filter rỗng/k=0/filter khớp đạt; benchmark corpus thật đạt. Ruff báo 2 lỗi tồn tại sẵn ở API (BLE001, TRY401); không coi toàn repo lint sạch.
+- Thêm scripts/benchmark_queries.py để tái đo. Cần khởi động lại app/API để dùng code mới.
+- Vấn đề audit còn lại: get_frame_timestamp fallback 25 FPS có thể sai ms khi thiếu map; /images đọc đường dẫn tùy ý nếu API bị expose; encode_images không dùng được khi visual tower đã bị xóa. Chưa sửa trong đợt tối ưu này.

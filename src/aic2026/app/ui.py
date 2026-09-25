@@ -36,18 +36,6 @@ from aic2026.submission import competition_answer, csv_row
 
 import re as _re
 
-# Ký tự có dấu tiếng Việt → dùng để nhận diện query tiếng Việt (cần dịch).
-_VI_MARK_RE = _re.compile(
-    r"[àáạảãâầấậẩẫăằắặẳẵđèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹ]",
-    _re.IGNORECASE,
-)
-
-
-def _is_english(text: str) -> bool:
-    """True nếu text KHÔNG chứa ký tự tiếng Việt có dấu."""
-    return not bool(_VI_MARK_RE.search(text or ""))
-
-
 # Helper to avoid Streamlit 1.40+ deprecation warnings for width/use_container_width
 _STREAMLIT_VERSION_PARTS = [int(p) for p in st.__version__.split(".")[:2] if p.isdigit()]
 _USE_WIDTH_STRETCH = bool(
@@ -624,7 +612,7 @@ def warmup_engine(
     clip_pretrained: str,
     backend_url: str = "http://127.0.0.1:8000",
 ) -> bool:
-    """Nạp trước Manifest tables và Model SigLIP2 + FAISS/Numpy index vào RAM/VRAM để lần tìm đầu tiên đạt tốc độ 0.1s."""
+    """Nạp trước manifest, model và index; báo lỗi nếu làm nóng thất bại."""
     load_all_manifest_tables(manifest_path)
     runtime = {
         "manifest_path": manifest_path,
@@ -636,10 +624,7 @@ def warmup_engine(
         "temporal_nms_enabled": False,
     }
     dummy_q = build_query("kis", "warmup", "", "")
-    try:
-        run_backend("kis", dummy_q, runtime, backend_url)
-    except Exception:
-        pass
+    run_backend("kis", dummy_q, runtime, backend_url)
     return True
 
 
@@ -1345,13 +1330,12 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
 # ---------------------------------------------------------------------------
 # Callback Function for Preset Chips (Executes BEFORE widgets instantiate)
 # ---------------------------------------------------------------------------
-def apply_preset_query(q_type: str, s_mode: str, q_text: str, q_question: str = "", q_events: str = "", translate: bool = False, model: str = "siglip2"):
+def apply_preset_query(q_type: str, s_mode: str, q_text: str, q_question: str = "", q_events: str = "", model: str = "siglip2"):
     st.session_state["query_type"] = q_type
     st.session_state["search_mode"] = s_mode
     st.session_state["query_text"] = q_text
     st.session_state["query_question"] = q_question
     st.session_state["query_events"] = q_events
-    st.session_state["cfg_translate"] = translate
     st.session_state["selected_model_choice"] = model
     st.session_state["_run_agent"] = True
 
@@ -1435,7 +1419,7 @@ with st.form("query_form", border=False):
     t_col, run_col = st.columns([3.8, 1], gap="small")
     with t_col:
         st.markdown('<div class="mini-label">🔍 Nội dung truy vấn (Enter để tìm kiếm)</div>', unsafe_allow_html=True)
-        text = st.text_input("Query", placeholder="Nhập câu mô tả tiếng Việt hoặc tiếng Anh...",
+        text = st.text_input("Query", placeholder="Nhập câu mô tả tiếng Anh...",
                              label_visibility="collapsed", key="query_text")
     with run_col:
         st.markdown('<div class="mini-label">&nbsp;</div>', unsafe_allow_html=True)
@@ -1468,7 +1452,6 @@ with chip_col2:
             "q_type": "kis",
             "s_mode": "siglip",
             "q_text": "Một đầu bếp chế biến món ăn trong chảo, với các miếng dồi trường màu trắng và rau xanh. Đầu bếp cho bông hẹ vào chảo.",
-            "translate": True,
             "model": "siglip2",
         },
         **_FULL_WIDTH,
@@ -1482,7 +1465,6 @@ with chip_col3:
             "q_type": "trake",
             "s_mode": "siglip",
             "q_events": "Một chiếc xe cứu thương màu trắng di chuyển trên đường phố đông đúc.\nXe cứu thương rẽ vào cổng bệnh viện lớn.\nCác nhân viên y tế mở cửa sau xe đẩy cáng cứu thương vào bên trong.",
-            "translate": True,
             "model": "siglip2",
         },
         **_FULL_WIDTH,
@@ -1501,21 +1483,12 @@ with chip_col4:
         **_FULL_WIDTH,
     )
 # Tùy chọn Tăng Tốc & Nâng Cao Chất Lượng Ranking
-rank_opt_col1, rank_opt_col3 = st.columns(2, gap="small")
-with rank_opt_col1:
-    translate_query = st.checkbox(
-        "🌐 Dịch VI→EN",
-        value=st.session_state.get("cfg_translate", False),
-        key="cfg_translate",
-        help="Dịch truy vấn tiếng Việt sang tiếng Anh trước khi đưa vào SigLIP. Bật khi nhập tiếng Việt.",
-    )
-with rank_opt_col3:
-    temporal_nms = st.checkbox(
-        "🎯 Lọc Đa Dạng Hóa (NMS)",
-        value=st.session_state.get("cfg_temporal_nms", True),
-        key="cfg_temporal_nms",
-        help="Loại bỏ các frame bị trùng lặp sát nhau trong cùng 1 video, giúp Top 10-20 đa dạng các góc máy & video khác nhau.",
-    )
+temporal_nms = st.checkbox(
+    "🎯 Lọc Đa Dạng Hóa (NMS)",
+    value=st.session_state.get("cfg_temporal_nms", True),
+    key="cfg_temporal_nms",
+    help="Loại bỏ các frame bị trùng lặp sát nhau trong cùng 1 video, giúp Top 10-20 đa dạng các góc máy & video khác nhau.",
+)
 
 # ---------------------------------------------------------------------------
 # Cấu hình 1-Click Master Root: Tự động ánh xạ toàn bộ đường dẫn con theo mô hình đã chọn
@@ -1562,12 +1535,12 @@ active_clip_model = auto_paths["clip_model"]
 active_clip_pretrained = auto_paths["clip_pretrained"]
 
 
-# Auto-warmup on start so the first real contest query responds in ~0.1s
+# Preload the shared corpus and encoder before the first real query.
 if not Path(active_manifest).is_file() or not Path(active_features).is_file():
     st.warning("⚠️ Thiếu manifest hoặc embedding SigLIP2. Kiểm tra lại đường dẫn thư mục dữ liệu ở trên.")
 else:
     try:
-        with st.spinner("⚡ Đang nạp trước Model SigLIP2 & FAISS Index vào VRAM (Khởi động nóng)..."):
+        with st.spinner("⚡ Đang nạp model SigLIP2 và index..."):
             warmup_engine(
                 active_manifest,
                 active_features,
@@ -1581,7 +1554,7 @@ else:
                 '<div style="background: rgba(16, 185, 129, 0.12); border: 1.5px solid rgba(16, 185, 129, 0.4); '
                 'border-radius: 8px; padding: 6px 12px; margin-bottom: 8px; font-size: 0.82rem; '
                 'display: flex; align-items: center; justify-content: space-between;">'
-                '<span>🟢 <b>Model SigLIP2 & Index đã nằm sẵn trong VRAM</b> · Tốc độ tìm kiếm: <b>~0.1s/query</b></span>'
+                '<span>🟢 <b>Model SigLIP2 & Index đã được nạp</b> · <b>Sẵn sàng tìm kiếm</b></span>'
                 '<span style="color: #6ee7b7; font-family: monospace; font-size: 0.75rem; font-weight: 700;">READY</span>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -1611,7 +1584,6 @@ if st.session_state.get("_run_agent"):
                     "llm_model": st.session_state.get("cfg_llm", "qwen3.5:4b"),
                     "ollama_url": st.session_state.get("cfg_ollama", "http://127.0.0.1:11434"),
                     "metadata_filter": st.session_state.get("cfg_filter", ""),
-                    "translate_query": bool(st.session_state.get("cfg_translate", False)),
                     "search_mode": "siglip",
                     "coarse_top_k": int(st.session_state.get("cfg_coarse_top_k", 200)),
                     "vlm_backend": "none",
@@ -1655,25 +1627,10 @@ if st.session_state.get("_run_agent"):
                     selected=[],
                     _query_nonce=st.session_state.get("_query_nonce", 0) + 1,
                 )
-                trim_process_memory()
-
-                translated = None
-                translation_source = None
                 for step in result.trace:
-                    if step.step == "translate":
-                        try:
-                            _td = json.loads(step.detail)
-                            translation_source = _td.get("source")
-                            _changes = _td.get("changes") or {}
-                            _text_change = _changes.get("text") or {}
-                            translated = _text_change.get("to") or _td.get("to")
-                        except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
-                            translated = None
-                st.session_state["translated_query"] = translated
-                if translated:
-                    st.toast(f"✅ Đã dịch VI→EN: {translated}", icon="🌐")
-                elif text.strip() and _is_english(text):
-                    st.toast("ℹ️ Query đã là tiếng Anh — không cần dịch", icon="🌐")
+                    if step.step == "timing":
+                        st.session_state["query_timing"] = step.detail
+
         except (BackendRequestError, ValidationError) as error:
             st.error(f"Không chạy được agent: {error}")
 
@@ -1684,6 +1641,8 @@ if st.session_state.get("_run_agent"):
 if "candidates" not in st.session_state:
     st.info("💡 Nhập nội dung truy vấn ở trên hoặc bấm vào các nút **Đề mẫu 1-Click** để bắt đầu tìm kiếm.")
 else:
+    if st.session_state.get("query_timing"):
+        st.caption(st.session_state["query_timing"])
     query: Query = st.session_state["query"]
     candidates: list[Candidate] = st.session_state["candidates"]
     root = Path(st.session_state.get("raw_root", active_root))

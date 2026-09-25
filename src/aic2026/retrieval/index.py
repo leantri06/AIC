@@ -115,7 +115,7 @@ class VectorIndex:
         returned candidates by manifest video_id after the nearest-neighbour
         scan. Pass ``None`` for no filtering.
         """
-        if not video_ids:
+        if video_ids is None:
             return self.search(query, k)
         if len(self.manifest_video_ids) != len(self.vectors):
             raise ValueError("manifest_video_ids must align with the vector index")
@@ -130,6 +130,8 @@ class VectorIndex:
             return np.array([], dtype=int), np.array([], dtype=np.float32)
         scores = self._cosine_for_ids(ids, query)
         k = min(k, len(ids))
+        if k <= 0:
+            return np.array([], dtype=int), np.array([], dtype=np.float32)
         top = np.argpartition(-scores, k - 1)[:k]
         top = top[np.argsort(-scores[top])]
         return ids[top], scores[top]
@@ -183,7 +185,7 @@ class VectorIndex:
         video_ids: set[str] | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Parallel multi-query vector search restricted to *video_ids*."""
-        if not video_ids:
+        if video_ids is None:
             return self.search_batch(queries, k)
         if len(self.manifest_video_ids) != len(self.vectors):
             raise ValueError("manifest_video_ids must align with the vector index")
@@ -209,10 +211,12 @@ class VectorIndex:
         if self._norms is not None:
             dots = dots / np.maximum(self._norms[cand_indices, None], 1e-12)
 
-        k_val = min(k, len(cand_indices))
+        k_val = max(0, min(k, len(cand_indices)))
         out_ids = np.empty((len(queries), k_val), dtype=np.int64)
         out_scores = np.empty((len(queries), k_val), dtype=np.float32)
 
+        if k_val == 0:
+            return out_ids, out_scores
         for i in range(len(queries)):
             col_scores = dots[:, i]
             part_idx = np.argpartition(-col_scores, k_val - 1)[:k_val]

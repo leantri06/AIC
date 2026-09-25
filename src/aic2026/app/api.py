@@ -3,18 +3,32 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from pathlib import Path
+from time import perf_counter
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from aic2026.agent.types import AgentResult
+from aic2026.agent.types import AgentResult, AgentTrace
 from aic2026.ingestion import resolve_feature_sources
 from aic2026.models import Query
 
 app = FastAPI(title="AIC 2026 Agent API", version="0.2.0")
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def load_retrieval_pipeline(manifest_path: str, features_path: str, backend: str, chroma_dir: str):
+    """Share the large read-only corpus across task and search-option changes."""
+    from aic2026.ingestion import load_manifest
+    from aic2026.retrieval import RetrievalPipeline, VideoMetadataStore
+    from aic2026.retrieval.factory import load_index_for_query
+
+    manifest = load_manifest(Path(manifest_path))
+    index = load_index_for_query(Path(features_path), manifest, backend=backend, chroma_dir=chroma_dir)
+    metadata = VideoMetadataStore.load(Path(manifest_path).parent / "video_metadata.jsonl")
+    return RetrievalPipeline(index, manifest, frames_per_video=20, video_metadata=metadata)
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -72,7 +86,6 @@ class RuntimeConfig(BaseModel):
     chroma_dir: str = "data/indexes/chroma"
     late_interaction_weight: float = 0.0
     metadata_filter: str = ""
-    translate_query: bool = False
     search_mode: Literal["siglip"] = "siglip"
     vlm_backend: str = "none"
     vlm_model: str = "microsoft/Florence-2-base-ft"
@@ -123,7 +136,6 @@ def load_orchestrator(
     backend: str = "faiss",
     chroma_dir: str = "data/indexes/chroma",
     metadata_filter: str = "",
-    translate_query: bool = False,
     vlm_backend: str = "none",
     late_interaction_weight: float = 0.0,
     vlm_model: str = "microsoft/Florence-2-base-ft",
@@ -145,37 +157,14 @@ def load_orchestrator(
     from aic2026.agent import OllamaLLM, RetrievalAgent
     from aic2026.agent.tools import RetrievalTools
     from aic2026.embeddings import OpenCLIPTextEmbedder
-    from aic2026.ingestion import load_manifest
-    from aic2026.retrieval import RetrievalPipeline
-    from aic2026.retrieval.factory import load_index_for_query
 
     manifest_file, features_file = resolve_feature_sources(manifest_path, features_path)
     missing = [str(path) for path in (manifest_file, features_file) if not path.exists()]
     if missing:
         hint = "Cần cặp siglip2_manifest.jsonl và siglip2_features.npy đã embed sẵn."
         raise FileNotFoundError(f"Thiếu index retrieval: {', '.join(missing)}. {hint}")
-    manifest_records = load_manifest(manifest_file)
-    # Per-video metadata (title/description/keywords) sống cùng thư mục với
-    # manifest. Load vào store để pipeline chạy được metadata pre-filter
-    # (filter_videos_by_metadata) — nếu không truyền, store rỗng và pre-filter
-    # bị skip dù tools.video_filter_terms có set.
-    from aic2026.retrieval import VideoMetadataStore
-
-    video_metadata = VideoMetadataStore.load(
-        manifest_file.parent / "video_metadata.jsonl"
-    )
-    index = load_index_for_query(
-        features_file,
-        manifest_records,
-        backend=backend,
-        chroma_dir=chroma_dir,
-    )
-
-    pipeline = RetrievalPipeline(
-        index,
-        manifest_records,
-        frames_per_video=20,
-        video_metadata=video_metadata,
+    pipeline = load_retrieval_pipeline(
+        str(manifest_file.resolve()), str(features_file.resolve()), backend, chroma_dir
     )
     text_encoder = OpenCLIPTextEmbedder(model_name=clip_model, pretrained=clip_pretrained)
     tools = RetrievalTools(
@@ -217,7 +206,6 @@ def load_orchestrator(
         ),
     )
     agent.coarse_top_k = coarse_top_k
-    agent.translate = translate_query
     return agent
 
 
@@ -234,6 +222,7 @@ def run_task(task_type: str, request: TaskRequest) -> AgentResult:
         import re
         parts = [p.strip() for p in re.split(r'[\n;.]+', request.text) if p.strip()]
         request.events = parts or [request.text]
+    started = perf_counter()
     try:
         config = request.runtime
         orchestrator = load_orchestrator(
@@ -245,13 +234,13 @@ def run_task(task_type: str, request: TaskRequest) -> AgentResult:
             backend=config.backend,
             chroma_dir=config.chroma_dir,
             metadata_filter=config.metadata_filter,
-            translate_query=config.translate_query,
             vlm_backend=config.vlm_backend,
             vlm_model=config.vlm_model,
             vlm_device=getattr(config, "vlm_device", None),
             vlm_dtype=getattr(config, "vlm_dtype", "float32"),
             vlm_timeout=config.vlm_timeout,
             late_interaction_weight=config.late_interaction_weight,
+            coarse_top_k=config.coarse_top_k,
             query_type=task_type,
             clip_model=config.clip_model,
             vlm_judge_enabled=config.vlm_judge_enabled,
@@ -262,8 +251,10 @@ def run_task(task_type: str, request: TaskRequest) -> AgentResult:
             blip2_top_k=getattr(config, "blip2_top_k", 30),
             temporal_nms_enabled=getattr(config, "temporal_nms_enabled", False),
         )
+        loaded = perf_counter()
         res = orchestrator.run(Query(query_id=request.query_id, type=task_type, text=request.text, question=request.question, events=request.events))
-        trim_process_memory()
+        finished = perf_counter()
+        res.trace.append(AgentTrace(step="timing", detail=f"load={loaded-started:.3f}s; search={finished-loaded:.3f}s; total={finished-started:.3f}s"))
         return res
     except HTTPException:
         raise
@@ -340,7 +331,6 @@ def run_qa_candidates(request: TaskRequest) -> AgentResult:
             backend=config.backend,
             chroma_dir=config.chroma_dir,
             metadata_filter=config.metadata_filter,
-            translate_query=config.translate_query,
             # VLM không cần cho phase-1: truyền vlm_backend="none" để bỏ qua
             vlm_backend="none",
             vlm_model=getattr(config, "vlm_model", "microsoft/Florence-2-base-ft"),

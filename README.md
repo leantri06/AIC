@@ -58,7 +58,7 @@ Báo cáo lưu vào `data/processed/siglip2_audit.json`. Audit kiểm tra cấu 
 - **KIS:** nhập mô tả hình ảnh để tìm keyframe.
 - **Q&A:** tìm ảnh theo mô tả/câu hỏi; nhập đáp án thủ công trước khi xuất CSV.
 - **TRAKE:** mỗi dòng là một sự kiện theo thứ tự thời gian.
-- Tùy chọn dịch VI→EN và lọc khung hình gần nhau (NMS).
+- Nhập truy vấn tiếng Anh trực tiếp; có tùy chọn lọc khung hình gần nhau (NMS).
 - Xem keyframe lân cận, chọn kết quả, tải CSV. Không có video gốc vẫn tìm/xem keyframe được.
 
 ASR, OCR, BGE-M3, BM25 và các lệnh CLI xử lý tương ứng đã được gỡ.
@@ -77,3 +77,17 @@ CLI:
 ```
 
 Tên file query phải trỏ tới JSON của bạn, gồm `query_id`, `type`, `text`; Q&A thêm `question`, TRAKE thêm `events`.
+
+## Đo tốc độ truy vấn
+
+Chờ bước làm nóng hoàn tất trước khi tìm. Index được dùng chung khi đổi KIS/QA/TRAKE hoặc NMS.
+Giao diện hiển thị thời gian nạp và tìm kiếm backend; chưa bao gồm truyền/hiển thị ảnh.
+
+```powershell
+.venv/Scripts/python.exe scripts/benchmark_queries.py
+.venv/Scripts/python.exe scripts/benchmark_queries.py --task trake --query "a man enters a room; a man sits on a chair"
+```
+
+Mẫu đo local RTX 3050 Laptop 4 GB ngày 25/9: KIS 1,41s, QA retrieval 1,26s,
+TRAKE hai sự kiện (coarse_top_k=200) 1,67s sau làm nóng. Đây là mẫu nhỏ,
+không phải p95 hoặc cam kết mọi truy vấn. Khởi động process mới vẫn khoảng 47–51s trong lần đo sau sửa.

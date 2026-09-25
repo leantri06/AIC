@@ -420,7 +420,7 @@ class RetrievalPipeline:
         returned rows. Either way the metadata pre-filter runs at the index
         tier instead of post-hoc Python masking.
         """
-        if video_ids:
+        if video_ids is not None:
             return self.index.search_filtered(text_embedding, top_frames, video_ids)
         return self.index.search(text_embedding, top_frames)
 
