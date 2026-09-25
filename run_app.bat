@@ -8,6 +8,8 @@ set "MKL_NUM_THREADS=1"
 if not defined AIC_DATA_ROOT set "AIC_DATA_ROOT=%~dp0..\data"
 if not defined HF_HOME set "HF_HOME=%AIC_DATA_ROOT%\.cache\huggingface"
 if not defined TORCH_HOME set "TORCH_HOME=%AIC_DATA_ROOT%\.cache\torch"
+set "HF_HUB_OFFLINE=1"
+set "TRANSFORMERS_OFFLINE=1"
 if exist ".venv\Scripts\python.exe" (
     ".venv\Scripts\python.exe" -m streamlit run src/aic2026/app/ui.py --server.port 8501 --server.address 127.0.0.1 --server.headless false --server.fileWatcherType none
 ) else (
