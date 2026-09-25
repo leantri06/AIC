@@ -311,8 +311,76 @@ button[data-testid="stBaseButton-primaryFormSubmit"] {{
   padding: 4px 0; border-radius: 5px; font-size: 0.72rem; font-weight: 700;
   cursor: pointer; transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 4px;
 }}
-.btn-copy-fast:hover {{ background: var(--btn-copy-hover); color: var(--text-main); }}
-.btn-copy-fast:active {{ transform: scale(0.96); }}
+/* Finals Submission Dock & Fast Copy Buttons */
+.finals-dock-container {{
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 2px solid #6366f1;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.28);
+}}
+.finals-dock-header {{
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; border-bottom: 1.5px solid rgba(99, 102, 241, 0.3);
+  padding-bottom: 8px;
+}}
+.finals-dock-badge {{
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff; font-weight: 900; font-size: 0.75rem;
+  padding: 3px 10px; border-radius: 999px; letter-spacing: 0.05em;
+  display: inline-flex; align-items: center; gap: 4px;
+}}
+.finals-val-box {{
+  background: rgba(0, 0, 0, 0.5); border: 1.5px solid var(--card-border);
+  border-radius: 8px; padding: 6px 12px; font-family: monospace;
+  font-size: 1.1rem; font-weight: 800; color: #38bdf8;
+  display: flex; align-items: center; justify-content: space-between;
+}}
+.finals-btn-copy {{
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #fff; border: 1px solid #38bdf8; border-radius: 6px;
+  padding: 6px 14px; font-weight: 800; font-size: 0.85rem; cursor: pointer;
+  box-shadow: 0 3px 10px rgba(2, 132, 199, 0.35); transition: all 0.15s ease;
+  display: inline-flex; align-items: center; gap: 6px;
+}}
+.finals-btn-copy:hover {{
+  background: #0284c7; transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(2, 132, 199, 0.55);
+}}
+.finals-btn-copy:active {{ transform: scale(0.96); }}
+.finals-btn-qa {{
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  color: #fff; border: 1px solid #f59e0b; border-radius: 6px;
+  padding: 8px 18px; font-weight: 800; font-size: 0.95rem; cursor: pointer;
+  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.35); transition: all 0.15s ease;
+  display: inline-flex; align-items: center; gap: 6px;
+}}
+.finals-btn-qa:hover {{ background: #f59e0b; transform: translateY(-1px); }}
+.finals-btn-trake {{
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #fff; border: 1px solid #10b981; border-radius: 6px;
+  padding: 8px 18px; font-weight: 800; font-size: 0.95rem; cursor: pointer;
+  box-shadow: 0 3px 10px rgba(5, 150, 105, 0.35); transition: all 0.15s ease;
+  display: inline-flex; align-items: center; gap: 6px;
+}}
+.finals-btn-trake:hover {{ background: #10b981; transform: translateY(-1px); }}
+
+.btn-card-id {{
+  border: 1px solid #6366f1; background: rgba(99, 102, 241, 0.15); color: #a5b4fc;
+  padding: 3px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 800;
+  cursor: pointer; transition: all 0.15s ease; width: 100%; text-align: center;
+}}
+.btn-card-id:hover {{ background: #4f46e5; color: #fff; }}
+.btn-card-ms {{
+  border: 1px solid #0284c7; background: rgba(2, 132, 199, 0.15); color: #38bdf8;
+  padding: 3px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 800;
+  cursor: pointer; transition: all 0.15s ease; width: 100%; text-align: center;
+}}
+.btn-card-ms:hover {{ background: #0284c7; color: #fff; }}
+
 
 /* Inputs & Form Submit Button */
 .stButton > button[data-testid="baseButton-primary"] {{
@@ -652,6 +720,7 @@ def get_single_video_pts_map(video_id: str, map_dir: str | Path | None = None) -
     for r in roots:
         candidates = [
             r / f"{clean_vid}.csv",
+            r / "map_keyframes" / f"{clean_vid}.csv",
             r / "map-keyframes" / f"{clean_vid}.csv",
         ]
         for c in candidates:
@@ -686,6 +755,16 @@ def get_frame_timestamp(
     if frame_id in pts_map:
         return pts_map[frame_id]
     return float(frame_id) / default_fps
+
+
+def get_frame_time_ms(
+    video_id: str,
+    frame_id: int,
+    map_dir: str | Path | None = None,
+    default_fps: float = 25.0,
+) -> int:
+    ts = get_frame_timestamp(video_id, frame_id, map_dir, default_fps)
+    return int(round(ts * 1000.0))
 
 
 @st.dialog("🎬 Trình Xem Video & Keyframe Inspector Pro", width="large")
@@ -930,6 +1009,155 @@ def _toggle(idx: int, nonce: int):
             s.remove(idx)
 
 
+def _render_finals_submission_dock(
+    query: Query,
+    candidates: list[Candidate],
+    selected: list[int],
+    map_dir: str,
+) -> None:
+    if not candidates:
+        return
+
+    # Mục tiêu nộp: ưu tiên ứng viên đầu tiên trong danh sách selected; nếu chưa chọn, mặc định lấy Top 1
+    target_idx = selected[0] if selected else 0
+    if target_idx >= len(candidates):
+        target_idx = 0
+    target_item = candidates[target_idx]
+
+    vid = target_item.video_id
+    fid = target_item.frame_id
+    ms = get_frame_time_ms(vid, fid, map_dir)
+    ts = get_frame_timestamp(vid, fid, map_dir)
+    ts_fmt = format_timestamp(ts)
+
+    # Chuỗi TRAKE
+    if query.type.upper() == "TRAKE" and target_item.event_frames:
+        trake_frames = ",".join(str(f) for f in target_item.event_frames)
+    elif selected:
+        trake_frames = ",".join(str(candidates[i].frame_id) for i in selected if candidates[i].video_id == vid)
+    else:
+        trake_frames = str(fid)
+    trake_str = f"TR-{vid}-{trake_frames}"
+
+    raw_payload_dict = {
+        "video_id": vid,
+        "frame_id": fid,
+        "time_ms": ms,
+        "formatted_time": ts_fmt,
+        "score": round(target_item.score, 4),
+    }
+    raw_json_str = json.dumps(raw_payload_dict, indent=2)
+
+    st.markdown(
+        f"""
+        <div class="finals-dock-container">
+          <div class="finals-dock-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.15rem; font-weight:900; color:#f8fafc;">⚡ TRẠM NỘP BÀI CHUNG KẾT AIC</span>
+              <span class="finals-dock-badge">🔥 5 PHÚT / DECAY SCORE</span>
+            </div>
+            <div style="font-size:0.85rem; color:#cbd5e1;">
+              Mục tiêu nộp: <b style="color:#818cf8;">#{target_idx + 1}</b> (<code>{html.escape(vid)}</code> · frame <b>{fid}</b> · <b style="color:#38bdf8;">{ms} ms</b> · {ts_fmt})
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    tab_kis, tab_qa, tab_trake, tab_raw = st.tabs([
+        "🎯 KIS (Text & Video)",
+        "❓ Q&A (Question & Answering)",
+        "🎬 TRAKE (Event Sequence)",
+        "📦 Raw JSON Payload",
+    ])
+
+    with tab_kis:
+        c1, c2, c3 = st.columns([1.4, 1.4, 1.8], gap="medium")
+        with c1:
+            st.markdown(
+                f"""
+                <div style="font-size:0.75rem; font-weight:800; color:#a5b4fc; margin-bottom:4px;">1️⃣ VIDEO ID</div>
+                <div class="finals-val-box">
+                  <span>{html.escape(vid)}</span>
+                  <button class="finals-btn-copy" onclick="navigator.clipboard.writeText('{html.escape(vid)}'); this.innerText='✅ Copied'; setTimeout(() => this.innerText='📋 Copy ID', 1200);">📋 Copy ID</button>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with c2:
+            st.markdown(
+                f"""
+                <div style="font-size:0.75rem; font-weight:800; color:#38bdf8; margin-bottom:4px;">2️⃣ FRAME TIME (ms) · {ts_fmt}</div>
+                <div class="finals-val-box">
+                  <span>{ms}</span>
+                  <button class="finals-btn-copy" onclick="navigator.clipboard.writeText('{ms}'); this.innerText='✅ Copied'; setTimeout(() => this.innerText='⏱️ Copy ms', 1200);">⏱️ Copy ms</button>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with c3:
+            st.markdown(
+                f"""
+                <div style="font-size:0.75rem; font-weight:800; color:#34d399; margin-bottom:4px;">⚡ COPY CẶP (VIDEO ID + TIME MS)</div>
+                <div style="margin-top:2px;">
+                  <button class="finals-btn-copy" style="width:100%; height:44px; font-size:0.9rem; background:linear-gradient(135deg, #059669 0%, #047857 100%); border-color:#10b981;"
+                    onclick="navigator.clipboard.writeText('{html.escape(vid)}\\t{ms}'); this.innerText='✅ ĐÃ COPY CẶP'; setTimeout(() => this.innerText='⚡ Copy Cặp (Video ID + ms)', 1200);">
+                    ⚡ Copy Cặp: {html.escape(vid)} & {ms}ms
+                  </button>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with tab_qa:
+        q_col1, q_col2 = st.columns([1.6, 2.4], gap="medium")
+        with q_col1:
+            ans_input = st.text_input(
+                "Nhập Answer Text:",
+                value=st.session_state.get("finals_qa_answer", ""),
+                key="finals_qa_answer_input",
+                placeholder="Ví dụ: Red, 3, Hanoi...",
+            )
+            if ans_input != st.session_state.get("finals_qa_answer", ""):
+                st.session_state["finals_qa_answer"] = ans_input
+                st.rerun()
+        with q_col2:
+            cur_ans = st.session_state.get("finals_qa_answer", "").strip() or "ANSWER"
+            cur_qa_str = f"QA-{cur_ans}-{vid}-{ms}"
+            st.markdown(
+                f"""
+                <div style="font-size:0.75rem; font-weight:800; color:#fbbf24; margin-bottom:4px;">CHUỖI NỘP BÀI Q&A CHUẨN BTC</div>
+                <div class="finals-val-box" style="color:#fbbf24; word-break:break-all; font-size:0.95rem;">
+                  <span><code>{html.escape(cur_qa_str)}</code></span>
+                  <button class="finals-btn-qa" onclick="navigator.clipboard.writeText('{html.escape(cur_qa_str)}'); this.innerText='✅ ĐÃ COPY'; setTimeout(() => this.innerText='📋 Copy Chuỗi QA', 1200);">📋 Copy Chuỗi QA</button>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with tab_trake:
+        st.markdown(
+            f"""
+            <div style="font-size:0.75rem; font-weight:800; color:#34d399; margin-bottom:4px;">CHUỖI NỘP BÀI TRAKE CHUẨN BTC: TR-&lt;VIDEO_ID&gt;-&lt;FRAME_IDS&gt;</div>
+            <div class="finals-val-box" style="color:#34d399; word-break:break-all; font-size:0.95rem;">
+              <span><code>{html.escape(trake_str)}</code></span>
+              <button class="finals-btn-trake" onclick="navigator.clipboard.writeText('{html.escape(trake_str)}'); this.innerText='✅ ĐÃ COPY'; setTimeout(() => this.innerText='📋 Copy Chuỗi TRAKE', 1200);">📋 Copy Chuỗi TRAKE</button>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with tab_raw:
+        st.code(raw_json_str, language="json")
+        st.markdown(
+            f"""
+            <button class="finals-btn-copy" onclick="navigator.clipboard.writeText({json.dumps(raw_json_str)}); this.innerText='✅ ĐÃ COPY JSON'; setTimeout(() => this.innerText='📋 Copy Raw JSON Payload', 1200);">📋 Copy Raw JSON Payload</button>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], root: Path, selected: list[int]) -> None:
     manifest_path = st.session_state.get("manifest_path")
     map_dir = st.session_state.get("cfg_map_keyframes", DEFAULT_MAP_KEYFRAMES)
@@ -941,6 +1169,7 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
     for pos, (idx, item) in enumerate(visible):
         path = keyframe_file(item, root)
         ts = get_frame_timestamp(item.video_id, item.frame_id, map_dir)
+        time_ms = get_frame_time_ms(item.video_id, item.frame_id, map_dir)
         is_sel = idx in selected
         sel_order = (selected.index(idx) + 1) if is_sel else None
 
@@ -954,7 +1183,7 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
             if path and path.exists():
                 st.markdown(
                     f'<div class="hero-wrap">'
-                    f'<span class="badge-time">⏱️ {format_timestamp(ts)}</span>'
+                    f'<span class="badge-time">⏱️ {time_ms}ms ({format_timestamp(ts)})</span>'
                     f'<span class="badge-score {score_class}">🎯 {item.score:.3f}</span>'
                     f'{order_html}</div>',
                     unsafe_allow_html=True,
@@ -966,13 +1195,13 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
             st.markdown(
                 f'<div class="card-meta">'
                 f'<span class="card-rank">#{idx + 1}</span> &nbsp;'
-                f'<span class="card-video">{html.escape(item.video_id)}</span> · <b>{item.frame_id}</b>'
+                f'<span class="card-video">{html.escape(item.video_id)}</span> · <b>{item.frame_id}</b> · <b style="color:#38bdf8;">{time_ms}ms</b>'
                 "</div>",
                 unsafe_allow_html=True,
             )
 
-            # Action bar: Xem Video, 1-Click Copy, Checkbox chọn
-            c_vid, c_cp, c_chk = st.columns([2.2, 1.3, 1.1], gap="small")
+            # Action bar: Xem Video & Checkbox chọn
+            c_vid, c_chk = st.columns([2.8, 1.2], gap="small")
             with c_vid:
                 if st.button(f"🎬 Xem ({format_timestamp(ts)})", key=f"btn_v_{nonce}_{idx}", **_FULL_WIDTH, help=f"Mở video {item.video_id} tại {format_timestamp(ts)}"):
                     show_video_dialog(
@@ -983,14 +1212,23 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                         videos_root=videos_root,
                         map_dir=map_dir,
                     )
-            with c_cp:
-                st.markdown(
-                    f"""<button class="btn-copy-fast" onclick="navigator.clipboard.writeText('{html.escape(item.video_id)}, {item.frame_id}'); this.innerText='✅ Copied'; setTimeout(() => this.innerText='📋 Copy', 1500);" title="Copy '{item.video_id}, {item.frame_id}'">📋 Copy</button>""",
-                    unsafe_allow_html=True,
-                )
             with c_chk:
                 st.checkbox("Chọn", key=f"sel_{nonce}_{idx}", value=is_sel, on_change=_toggle, args=(idx, nonce), label_visibility="collapsed")
+
+            # 2 Fast Copy buttons for Finals App
+            c_id, c_ms = st.columns(2, gap="small")
+            with c_id:
+                st.markdown(
+                    f"""<button class="btn-card-id" onclick="navigator.clipboard.writeText('{html.escape(item.video_id)}'); this.innerText='✅ Copied'; setTimeout(() => this.innerText='📋 ID', 1000);" title="Copy Video ID '{item.video_id}'">📋 ID</button>""",
+                    unsafe_allow_html=True,
+                )
+            with c_ms:
+                st.markdown(
+                    f"""<button class="btn-card-ms" onclick="navigator.clipboard.writeText('{time_ms}'); this.innerText='✅ Copied'; setTimeout(() => this.innerText='⏱️ {time_ms}ms', 1000);" title="Copy Frame Time '{time_ms}ms'">⏱️ {time_ms}ms</button>""",
+                    unsafe_allow_html=True,
+                )
             st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], root: Path, selected: list[int]) -> None:
@@ -1007,16 +1245,21 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
         is_sel = idx in selected
         sel_order = (selected.index(idx) + 1) if is_sel else None
         event_frames = item.event_frames or []
+        frames_csv = ",".join(str(f) for f in event_frames)
+        trake_str = f"TR-{item.video_id}-{frames_csv}"
 
         st.markdown(
             f'<div style="background: var(--card-bg); border: 2px solid {"var(--card-selected-border)" if is_sel else "var(--card-border)"}; '
             f'border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.25);">'
-            f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">'
+            f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">'
             f'  <div><span style="font-weight:900; color:#818cf8; font-size:1.15rem;">#{idx + 1}</span> '
             f'  <span style="font-weight:800; font-size:1.05rem; margin-left:6px;">📹 Video: <code>{html.escape(item.video_id)}</code></span> · '
             f'  <span style="font-size:0.88rem; color:var(--text-muted);">Độ khớp chuỗi: <b>{item.score:.3f}</b></span></div>'
-            f'  <span style="background: rgba(99, 102, 241, 0.2); color:#a5b4fc; padding: 3px 10px; border-radius: 999px; font-weight:700; font-size:0.78rem;">'
-            f'  Chuỗi {len(event_frames)} hành động {f"(Chọn #{sel_order})" if is_sel else ""}</span>'
+            f'  <div style="display:flex; align-items:center; gap:8px;">'
+            f"""    <button class="finals-btn-trake" onclick="navigator.clipboard.writeText('{html.escape(trake_str)}'); this.innerText='✅ ĐÃ COPY'; setTimeout(() => this.innerText='📋 Copy Chuỗi TRAKE', 1200);" style="padding:4px 12px; font-size:0.82rem;">📋 Copy Chuỗi: <code>{html.escape(trake_str)}</code></button>"""
+            f'    <span style="background: rgba(99, 102, 241, 0.2); color:#a5b4fc; padding: 3px 10px; border-radius: 999px; font-weight:700; font-size:0.78rem;">'
+            f'    Chuỗi {len(event_frames)} hành động {f"(Chọn #{sel_order})" if is_sel else ""}</span>'
+            f'  </div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1476,8 +1719,10 @@ else:
         visible = (chosen + rest)[:max_show]
 
         if query.type.lower() == "trake":
+            _render_finals_submission_dock(query, candidates, selected, st.session_state.get("cfg_map_keyframes", active_map_keyframes))
             _render_trake_gallery(query, visible, root, selected)
         else:
+            _render_finals_submission_dock(query, candidates, selected, st.session_state.get("cfg_map_keyframes", active_map_keyframes))
             _render_frame_gallery(query, visible, root, selected)
 
         # Thanh xuất CSV chuẩn nộp bài BTC

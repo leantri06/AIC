@@ -385,3 +385,36 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 - Thêm `.ruff_cache/` vào `.gitignore`.
 - Cập nhật `README.md` và `MEMORY.md`.
 - Sẵn sàng stage, commit và push lên nhánh `main` trên GitHub.
+
+## Thích ứng Thể thức Chung kết AIC 2026-09-25
+
+### Thể thức thi đấu mới (Finals):
+- Thời gian: **5 phút / câu**, điểm giảm dần theo thời gian nộp (decay score).
+- Đề bài chiếu trên màn hình, **không thể Ctrl+C/V** đề.
+- BTC có App riêng để nộp bài (không còn nộp CSV trực tiếp):
+  + **KIS** (Textual & Video KIS): Nhập `Video ID` + `Frame Time (ms)`.
+  + **Q&A**: Nhập `Answer` + `Video ID` + `Frame Time (ms)` → App tự sinh `QA-<ANSWER>-<VIDEO_ID>-<TIME(ms)>`.
+  + **TRAKE**: Nhập `Video ID` + `danh sách Frame IDs` → App tự sinh `TR-<VIDEO_ID>-<F1>,<F2>,...`.
+  + **Raw JSON**: Payload thô.
+
+### Cải tiến `src/aic2026/app/ui.py` đêm trước Chung kết:
+- Thêm hàm `get_frame_time_ms(video_id, frame_id)` → trả về `int` mili-giây tính từ `pts_time × 1000` trong `map_keyframes/*.csv`.
+- Thêm `_render_finals_submission_dock(query, candidates, selected, map_dir)`:
+  + Xác định mục tiêu nộp là ứng viên đầu tiên trong `selected`, hoặc **Top #1** nếu chưa chọn.
+  + 4 Tab tương ứng 4 định dạng của App BTC:
+    * **Tab KIS**: Hiển thị `Video ID` + `Frame Time ms` (lấy từ BTC map_keyframes thực) + nút 1-Click Copy riêng từng trường + nút Copy Cặp (Tab-separated `VideoID\t{ms}`).
+    * **Tab Q&A**: Ô nhập Answer → Tự sinh chuỗi `QA-<ANSWER>-<VIDEO_ID>-<TIME(ms)>` + nút Copy.
+    * **Tab TRAKE**: Sinh tự động chuỗi `TR-<VIDEO_ID>-<F1>,<F2>,...` từ `event_frames` hoặc frames đã chọn + nút Copy.
+    * **Tab Raw JSON**: Payload JSON đầy đủ + nút Copy.
+- Cập nhật `_render_frame_gallery`:
+  + Badge trên ảnh hiển thị `{ms}ms ({MM:SS.ss})`.
+  + Card-meta hiển thị `video_id · frame_id · {ms}ms` (màu xanh nổi bật).
+  + Action bar đơn giản hóa thành 2 cột: `[🎬 Xem]` + `[Chọn]`.
+  + Thêm 2 nút mini bên dưới mỗi ảnh: `[📋 ID]` copy Video ID và `[⏱️ {ms}ms]` copy Frame Time ms.
+- Cập nhật `_render_trake_gallery`: Mỗi kết quả có nút **Copy Chuỗi TRAKE** ngay trên header.
+- Dock được gọi cho **cả hai chế độ KIS/QA và TRAKE** trước khi render gallery.
+- `get_single_video_pts_map`: Hỗ trợ thêm `map_keyframes/` (dấu gạch dưới) bên cạnh `map-keyframes/`.
+
+### Chiến thuật thi đấu (khuyến nghị):
+- Gõ **3-5 từ khóa tiếng Anh** (không cần câu đầy đủ) → Search trong 0.2s → Quét Top 5 → Bấm **Copy ms** trên ảnh đúng → Dán vào App BTC → Nộp trong **< 45 giây** → Ăn điểm tối đa.
+- Bật **English Direct Mode** (bỏ tick "Dịch VI→EN") khi nhập tiếng Anh trực tiếp.
