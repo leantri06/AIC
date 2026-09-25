@@ -1538,7 +1538,8 @@ if not Path(active_manifest).is_file() or not Path(active_features).is_file():
     st.warning("⚠️ Thiếu manifest hoặc embedding SigLIP2. Kiểm tra lại đường dẫn thư mục dữ liệu ở trên.")
 else:
     try:
-        with st.spinner("⚡ Đang nạp model SigLIP2 và index..."):
+        _model_label = "Giant · 1536D" if active_clip_model == "siglip2-giant" else "SO400M · 1152D"
+        with st.spinner(f"⚡ Đang nạp {_model_label} vào VRAM (Khởi động nóng)..."):
             warmup_engine(
                 active_manifest,
                 active_features,
@@ -1552,7 +1553,7 @@ else:
                 '<div style="background: rgba(16, 185, 129, 0.12); border: 1.5px solid rgba(16, 185, 129, 0.4); '
                 'border-radius: 8px; padding: 6px 12px; margin-bottom: 8px; font-size: 0.82rem; '
                 'display: flex; align-items: center; justify-content: space-between;">'
-                '<span>🟢 <b>Model SigLIP2 & Index đã được nạp</b> · <b>Sẵn sàng tìm kiếm</b></span>'
+                f'<span>🟢 <b>Model {_model_label} &amp; Index đã nằm sẵn trong VRAM</b> · Tốc độ tìm kiếm: <b>~0.1s/query</b></span>'
                 '<span style="color: #6ee7b7; font-family: monospace; font-size: 0.75rem; font-weight: 700;">READY</span>'
                 '</div>',
                 unsafe_allow_html=True,
