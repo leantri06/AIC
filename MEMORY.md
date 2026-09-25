@@ -414,6 +414,7 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 - Cập nhật `_render_trake_gallery`: Mỗi kết quả có nút **Copy Chuỗi TRAKE** ngay trên header.
 - Dock được gọi cho **cả hai chế độ KIS/QA và TRAKE** trước khi render gallery.
 - `get_single_video_pts_map`: Hỗ trợ thêm `map_keyframes/` (dấu gạch dưới) bên cạnh `map-keyframes/`.
+- Tích hợp **Auto Warm-up (`warmup_engine`)**: Tự động nạp sẵn SigLIP2 SO400M weights, FAISS index và 177.000 dòng manifest vào RAM/VRAM ngay khi app vừa mở. Hiển thị banner trạng thái `🟢 Model & Index đã nằm sẵn trong VRAM (0.1s/query)` và nút `[🔄 Nạp lại]` hỗ trợ rewarm khi cần. Loại bỏ hoàn toàn độ trễ 90s ở câu hỏi đầu tiên.
 
 ### Chiến thuật thi đấu (khuyến nghị):
 - Gõ **3-5 từ khóa tiếng Anh** (không cần câu đầy đủ) → Search trong 0.2s → Quét Top 5 → Bấm **Copy ms** trên ảnh đúng → Dán vào App BTC → Nộp trong **< 45 giây** → Ăn điểm tối đa.

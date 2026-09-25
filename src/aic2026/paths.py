@@ -16,10 +16,11 @@ def default_data_root() -> Path:
     return workspace_data
 
 
-def resolve_data_root_and_paths(base_str: str, model_choice: str = "siglip2") -> dict[str, str]:
+def resolve_data_root_and_paths(base_str: str | Path, model_choice: str = "siglip2") -> dict[str, str]:
     if model_choice != "siglip2":
         raise ValueError("This application uses the precomputed SigLIP2 index only.")
-    base = Path(base_str.strip(" '\"")) if base_str.strip() else default_data_root()
+    s_val = str(base_str).strip(" '\"") if base_str else ""
+    base = Path(s_val) if s_val else default_data_root()
     data = (base / "data" if (base / "data").is_dir() else base).resolve()
 
     def directory(*names: str) -> str:
