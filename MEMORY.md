@@ -462,10 +462,15 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 - Đối chiếu toàn bộ 397.591 dòng manifest với CSV theo n: tất cả timestamp khớp; 628 dòng lấy thời gian đúng khác cách tra cũ. Ví dụ L21_V006 frame0: 001.jpg=0ms, 002.jpg=33ms.
 - Kiểm chứng: 2 pytest regression đạt (frame trùng, Windows/POSIX path, ordinal sai, cache khác root và refresh); AST-extracted UI wrapper trả 0/33ms đúng; compileall, lint module/test và diff check đạt. Chưa thao tác trình duyệt/clipboard. Dữ liệu gốc giữ nguyên. Cần restart app để dùng code mới.
 
-## Kiểm tra embedding SigLIP2 Giant mới — 2026-09-25
+## Tích hợp và kiểm chứng SigLIP2 Giant — 2026-09-25
 
-- Người dùng đặt siglip2_giant_features.npy và siglip2_giant_manifest.jsonl trong data/processed, hỏi có nên dùng. Chưa chuyển runtime.
-- Kiểm tra toàn ma trận: 397.591 x 1.536 float32, 2.442.799.232 bytes, finite, norms 0.99999982..1.00000012. Manifest 397.591 dòng/1.487 video, vector_id tuần tự.
-- Thứ tự toàn bộ dòng khác manifest cũ, nhưng multiset (video_id, frame_id, tên ảnh) giống hệt; đối chiếu CSV theo ordinal không có mismatch. Phải dùng manifest Giant đi kèm, không ghép vector Giant với manifest cũ.
-- Runtime hiện khóa SO400M (1.152 chiều); cần đúng text encoder/tokenizer/checkpoint tương ứng Giant. Manifest mới không ghi model/checkpoint; tên Giant và 1.536 chiều không đủ xác định biến thể. Chờ thông tin bên cung cấp (ví dụ checkpoint 256/384 và thư viện).
-- Đề xuất thử A/B riêng, giữ bộ cũ làm mặc định đến khi kiểm chứng recall và tốc độ <5s. Chưa tải model, chưa benchmark Giant/query, chưa chứng minh Giant tốt hơn trên câu thi. RTX3050 Laptop 4GB, cần đo chi phí text encoder; không cần chạy lại image embedding nếu bộ nhận đúng provenance.
+- **Tích hợp Model SigLIP2 Giant (1536D)** (`google/siglip2-giant-opt-patch16-384`):
+  + Tạo `src/aic2026/embeddings/giant.py` nạp `Siglip2TextModel` tối ưu chỉ dùng text tower (chỉ cần shard 1: `model-00001-of-00002.safetensors` ~4.65 GB thay vì toàn bộ 10+ GB vision tower), tiết kiệm dung lượng đĩa và VRAM.
+  + Tạo `src/aic2026/embeddings/factory.py` cho phép chuyển đổi linh hoạt giữa `siglip2` (SO400M 1152D) và `siglip2-giant` (Giant 1536D).
+  + Cập nhật `paths.py`, `api.py` và `ui.py`: thêm selectbox chọn model trên UI, cơ chế kiểm tra strict paired index (chặn lẫn lộn manifest/vector giữa SO400M và Giant), cập nhật warmup banner hiển thị rõ model đang nạp.
+- **Tải trọng lượng**: Viết `scripts/download_giant_model.py` tải trực tiếp shard text weights từ HuggingFace Hub có resume HTTP Range. Đã tải hoàn tất 100% (4.763 MB) và link vào snapshot cache HF.
+- **Kiểm thử unit test**: `tests/test_giant.py` (3 test: paired manifest check, reject mixed pairs, text-only checkpoint loading) đều **PASSED 3/3**.
+- **Đo benchmark thực tế** (`scripts/benchmark_queries.py --model siglip2-giant`):
+  + Cold warmup: 37.6s (nạp Giant text tower weights + nạp 2.4 GB vector matrix 397.591 × 1536).
+  + Warm retrieval latency: **0.92s – 1.02s / query**, trả về 100 candidates chính xác.
+- **Git**: Đã commit và push toàn bộ code lên `origin/main` (`3742d71`, `e0add9a`).
