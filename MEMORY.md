@@ -447,3 +447,10 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 - Tái hiện lỗi TRAKE với corpus synthetic 2 video: coarse top1 chọn A trước rồi giao bộ lọc {B}, trả 0 dù B có frame hợp lệ; coarse=0 trả B. Cần áp dụng video filter trước coarse top-k. Luồng UI mặc định không bật metadata filter nên không khẳng định các kết quả mặc định bị lỗi này.
 - Đề xuất ưu tiên sửa thao tác nộp/copy, bộ lọc TRAKE; sau đó đo end-to-end/p95 trên nhiều câu và recall top5/top10 có nhãn. _record_lookup hiện dựng dict toàn corpus mỗi lần gọi kể cả các rerank weight=0; có thể tránh việc thừa này để giảm latency/allocations.
 - Đợt này chỉ audit, không đổi hành vi ứng dụng; chưa kiểm chứng clipboard bằng trình duyệt và chưa đánh giá recall.
+
+## Giải thích 637 khóa frame trùng — 2026-09-25
+
+- Đối chiếu chi tiết: 637 nhóm, mỗi nhóm 2 dòng manifest có cùng (video_id, frame_id) nhưng KHÁC keyframe_path. Phân bố: L=614, M=16, S=7, N=0. Không phải bằng chứng một file ảnh được nhập hai lần.
+- Cả 637 nhóm đều tồn tại nguyên trong CSV BTC với cùng số dòng. Có 628 nhóm khác pts_time, chênh tối đa 40ms; 9 nhóm cùng pts_time. Chưa hash/so sánh pixels để kết luận nội dung ảnh có trùng.
+- Ví dụ L21_V006: n=1/001.jpg -> frame_idx=0, pts_time=0; n=2/002.jpg -> frame_idx=0, pts_time=0.0333333. Có dấu hiệu quy đổi/làm tròn frame_idx ở nguồn nhưng chưa có code tạo CSV BTC nên không kết luận nguyên nhân sinh mapping.
+- Đính chính mức kiểm chứng timestamp: tất cả frame có timestamp KHÔNG đồng nghĩa mapping frame_idx -> pts_time duy nhất. UI dict hiện lấy dòng cuối khi frame_idx trùng, có thể sai đến 40ms so với ảnh được chọn trong các nhóm đã kiểm tra. Cách sửa phù hợp: tra timestamp theo ordinal tên ảnh/n trước, không tự xóa dòng hay đổi frame_idx BTC. Chưa thực hiện sửa ở lượt giải thích này.
