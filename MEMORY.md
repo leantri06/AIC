@@ -461,3 +461,11 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 - UI truyền keyframe_path vào timestamp ở gallery, dock nộp KIS/QA/Raw JSON, TRAKE gallery và video dialog. Dialog giữ đúng ảnh đã chọn khi frame_id trùng, state phân biệt theo ảnh ban đầu. Cache CSV theo absolute path + mtime_ns + size, tránh dùng nhầm khi đổi data root.
 - Đối chiếu toàn bộ 397.591 dòng manifest với CSV theo n: tất cả timestamp khớp; 628 dòng lấy thời gian đúng khác cách tra cũ. Ví dụ L21_V006 frame0: 001.jpg=0ms, 002.jpg=33ms.
 - Kiểm chứng: 2 pytest regression đạt (frame trùng, Windows/POSIX path, ordinal sai, cache khác root và refresh); AST-extracted UI wrapper trả 0/33ms đúng; compileall, lint module/test và diff check đạt. Chưa thao tác trình duyệt/clipboard. Dữ liệu gốc giữ nguyên. Cần restart app để dùng code mới.
+
+## Kiểm tra embedding SigLIP2 Giant mới — 2026-09-25
+
+- Người dùng đặt siglip2_giant_features.npy và siglip2_giant_manifest.jsonl trong data/processed, hỏi có nên dùng. Chưa chuyển runtime.
+- Kiểm tra toàn ma trận: 397.591 x 1.536 float32, 2.442.799.232 bytes, finite, norms 0.99999982..1.00000012. Manifest 397.591 dòng/1.487 video, vector_id tuần tự.
+- Thứ tự toàn bộ dòng khác manifest cũ, nhưng multiset (video_id, frame_id, tên ảnh) giống hệt; đối chiếu CSV theo ordinal không có mismatch. Phải dùng manifest Giant đi kèm, không ghép vector Giant với manifest cũ.
+- Runtime hiện khóa SO400M (1.152 chiều); cần đúng text encoder/tokenizer/checkpoint tương ứng Giant. Manifest mới không ghi model/checkpoint; tên Giant và 1.536 chiều không đủ xác định biến thể. Chờ thông tin bên cung cấp (ví dụ checkpoint 256/384 và thư viện).
+- Đề xuất thử A/B riêng, giữ bộ cũ làm mặc định đến khi kiểm chứng recall và tốc độ <5s. Chưa tải model, chưa benchmark Giant/query, chưa chứng minh Giant tốt hơn trên câu thi. RTX3050 Laptop 4GB, cần đo chi phí text encoder; không cần chạy lại image embedding nếu bộ nhận đúng provenance.
