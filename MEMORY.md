@@ -431,3 +431,11 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 - Kiểm chứng: compileall, git diff --check, regression trực tiếp NumPy cho filter rỗng/k=0/filter khớp đạt; benchmark corpus thật đạt. Ruff báo 2 lỗi tồn tại sẵn ở API (BLE001, TRY401); không coi toàn repo lint sạch.
 - Thêm scripts/benchmark_queries.py để tái đo. Cần khởi động lại app/API để dùng code mới.
 - Vấn đề audit còn lại: get_frame_timestamp fallback 25 FPS có thể sai ms khi thiếu map; /images đọc đường dẫn tùy ý nếu API bị expose; encode_images không dùng được khi visual tower đã bị xóa. Chưa sửa trong đợt tối ưu này.
+
+## Thông báo BTC tên media-info S01 ngày 2026-09-25
+
+- Người dùng báo BTC đính chính S01_V0*.json phải tương ứng video S01-V0*.mp4.
+- Kiểm tra local: 12 JSON S01_V001..S01_V012 trong data/extracted/media_info; keyframe và CSV đều dùng S01-V001..S01-V012. JSON chứa title/description/keywords và thông tin nguồn video, không phải CSV timestamp.
+- Đối chiếu toàn bộ 37.140 dòng manifest S01 với map_keyframes: không có frame nào thiếu giá trị pts_time (kiểm tra hiện diện, chưa đối chiếu video gốc).
+- Sửa ingestion.manifest._metadata: ưu tiên tên đúng S01-V0*.json, fallback tên cũ S01_V0*.json chỉ cho nhóm BTC nêu. Đọc thành công 12/12; kiểm tra ưu tiên tên đúng và không ảnh hưởng nhóm khác đạt.
+- Không đổi tên/xóa dữ liệu, không sửa manifest/index/embedding. Manifest hiện có metadata_path=None ở S01; sửa loader có hiệu lực khi đọc/import metadata lần sau, không tự backfill manifest hiện tại. Luồng tìm kiếm visual hiện tại không cần rebuild vì thông báo đổi tên JSON này.

@@ -40,6 +40,10 @@ def _metadata(metadata_dir: Path | None, video_id: str) -> tuple[dict, Path | No
     if metadata_dir is None:
         return {}, None
     path = metadata_dir / f"{video_id}.json"
+    # BTC correction: S01-V0*.mp4 metadata was distributed as S01_V0*.json.
+    # Prefer the corrected filename, but keep the original download usable.
+    if not path.exists() and re.fullmatch(r"S01-V0\d+", video_id):
+        path = metadata_dir / f"{video_id.replace('S01-', 'S01_', 1)}.json"
     try:
         return json.loads(path.read_text(encoding="utf-8")), path
     except (OSError, json.JSONDecodeError):
