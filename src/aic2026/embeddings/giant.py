@@ -23,22 +23,12 @@ class SigLIP2GiantTextEmbedder:
         from transformers import AutoTokenizer, SiglipTextModel
 
         # Load only the text tower; image vectors are already computed.
-        # Prefer local cache so startup never hangs on slow/unstable competition internet.
-        try:
-            self.tokenizer = AutoTokenizer.from_pretrained(GIANT_MODEL, local_files_only=True)
-            self.model = SiglipTextModel.from_pretrained(
-                GIANT_MODEL,
-                torch_dtype=self.torch.float16 if self.device.startswith("cuda") else self.torch.float32,
-                use_safetensors=True,
-                local_files_only=True,
-            ).eval().to(self.device)
-        except Exception:
-            self.tokenizer = AutoTokenizer.from_pretrained(GIANT_MODEL)
-            self.model = SiglipTextModel.from_pretrained(
-                GIANT_MODEL,
-                torch_dtype=self.torch.float16 if self.device.startswith("cuda") else self.torch.float32,
-                use_safetensors=True,
-            ).eval().to(self.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(GIANT_MODEL)
+        self.model = SiglipTextModel.from_pretrained(
+            GIANT_MODEL,
+            torch_dtype=self.torch.float16 if self.device.startswith("cuda") else self.torch.float32,
+            use_safetensors=True,
+        ).eval().to(self.device)
 
     def encode(self, text: str) -> np.ndarray:
         self.load()
