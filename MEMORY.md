@@ -439,3 +439,11 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 - Đối chiếu toàn bộ 37.140 dòng manifest S01 với map_keyframes: không có frame nào thiếu giá trị pts_time (kiểm tra hiện diện, chưa đối chiếu video gốc).
 - Sửa ingestion.manifest._metadata: ưu tiên tên đúng S01-V0*.json, fallback tên cũ S01_V0*.json chỉ cho nhóm BTC nêu. Đọc thành công 12/12; kiểm tra ưu tiên tên đúng và không ảnh hưởng nhóm khác đạt.
 - Không đổi tên/xóa dữ liệu, không sửa manifest/index/embedding. Manifest hiện có metadata_path=None ở S01; sửa loader có hiệu lực khi đọc/import metadata lần sau, không tự backfill manifest hiện tại. Luồng tìm kiếm visual hiện tại không cần rebuild vì thông báo đổi tên JSON này.
+
+## Rà soát mức sẵn sàng hệ thống 2026-09-25
+
+- Kiểm tra read-only toàn bộ manifest với CSV hiện tại: 397.591 dòng, 1.487 video; 0 frame thiếu timestamp, 0 dòng CSV timestamp âm/không hữu hạn/không parse được. Có 637 dòng dư trùng (video_id, frame_id), chưa tự xóa. TRAKE hiện đã dedup frame khi dựng timeline.
+- Phát hiện chưa sửa: UI giữ finals_qa_answer/finals_qa_answer_input giữa các truy vấn, có thể ghép đáp án câu trước vào video câu mới. Raw JSON copy lồng json.dumps trong thuộc tính onclick có dấu nháy kép chưa escape; tái hiện HTMLParser chỉ đọc được onclick=navigator.clipboard.writeText(. Nút QA cũng dùng HTML escaping thay vì JS string escaping; cần thay cơ chế copy và kiểm tra trình duyệt thật.
+- Tái hiện lỗi TRAKE với corpus synthetic 2 video: coarse top1 chọn A trước rồi giao bộ lọc {B}, trả 0 dù B có frame hợp lệ; coarse=0 trả B. Cần áp dụng video filter trước coarse top-k. Luồng UI mặc định không bật metadata filter nên không khẳng định các kết quả mặc định bị lỗi này.
+- Đề xuất ưu tiên sửa thao tác nộp/copy, bộ lọc TRAKE; sau đó đo end-to-end/p95 trên nhiều câu và recall top5/top10 có nhãn. _record_lookup hiện dựng dict toàn corpus mỗi lần gọi kể cả các rerank weight=0; có thể tránh việc thừa này để giảm latency/allocations.
+- Đợt này chỉ audit, không đổi hành vi ứng dụng; chưa kiểm chứng clipboard bằng trình duyệt và chưa đánh giá recall.
