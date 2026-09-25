@@ -454,3 +454,10 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
 - Cả 637 nhóm đều tồn tại nguyên trong CSV BTC với cùng số dòng. Có 628 nhóm khác pts_time, chênh tối đa 40ms; 9 nhóm cùng pts_time. Chưa hash/so sánh pixels để kết luận nội dung ảnh có trùng.
 - Ví dụ L21_V006: n=1/001.jpg -> frame_idx=0, pts_time=0; n=2/002.jpg -> frame_idx=0, pts_time=0.0333333. Có dấu hiệu quy đổi/làm tròn frame_idx ở nguồn nhưng chưa có code tạo CSV BTC nên không kết luận nguyên nhân sinh mapping.
 - Đính chính mức kiểm chứng timestamp: tất cả frame có timestamp KHÔNG đồng nghĩa mapping frame_idx -> pts_time duy nhất. UI dict hiện lấy dòng cuối khi frame_idx trùng, có thể sai đến 40ms so với ảnh được chọn trong các nhóm đã kiểm tra. Cách sửa phù hợp: tra timestamp theo ordinal tên ảnh/n trước, không tự xóa dòng hay đổi frame_idx BTC. Chưa thực hiện sửa ở lượt giải thích này.
+
+## Sửa timestamp theo đúng ảnh — 2026-09-25
+
+- Thêm data_platform/timestamps.py: CSV tra theo ordinal tên ảnh -> cột n -> (frame_idx, pts_time), kiểm tra frame_id khớp trước khi dùng. Giữ fallback frame-id cho caller không có ảnh; không sửa CSV/frame_id/vector.
+- UI truyền keyframe_path vào timestamp ở gallery, dock nộp KIS/QA/Raw JSON, TRAKE gallery và video dialog. Dialog giữ đúng ảnh đã chọn khi frame_id trùng, state phân biệt theo ảnh ban đầu. Cache CSV theo absolute path + mtime_ns + size, tránh dùng nhầm khi đổi data root.
+- Đối chiếu toàn bộ 397.591 dòng manifest với CSV theo n: tất cả timestamp khớp; 628 dòng lấy thời gian đúng khác cách tra cũ. Ví dụ L21_V006 frame0: 001.jpg=0ms, 002.jpg=33ms.
+- Kiểm chứng: 2 pytest regression đạt (frame trùng, Windows/POSIX path, ordinal sai, cache khác root và refresh); AST-extracted UI wrapper trả 0/33ms đúng; compileall, lint module/test và diff check đạt. Chưa thao tác trình duyệt/clipboard. Dữ liệu gốc giữ nguyên. Cần restart app để dùng code mới.

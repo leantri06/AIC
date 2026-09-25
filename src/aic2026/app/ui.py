@@ -31,6 +31,7 @@ from pydantic import ValidationError
 
 from aic2026.ingestion import load_manifest
 from aic2026.models import Candidate, Query
+from aic2026.data_platform.timestamps import TimestampMap, load_timestamp_map
 from aic2026.paths import default_data_root, resolve_data_root_and_paths, resolve_keyframe
 from aic2026.submission import competition_answer, csv_row
 
@@ -674,7 +675,6 @@ def build_btc_csv(query: Query, candidates: list[Candidate], selected_idx: list[
 
 
 _VIDEO_FILE_CACHE: dict[str, Path] = {}
-_PTS_CACHE: dict[str, dict[int, float]] = {}
 
 
 def resolve_video_file(video_id: str, custom_root: str | Path | None = None) -> Path | None:
@@ -717,11 +717,8 @@ def format_timestamp(seconds: float) -> str:
     return f"{m:02d}:{s:02d}.{ms:02d}"
 
 
-def get_single_video_pts_map(video_id: str, map_dir: str | Path | None = None) -> dict[int, float]:
+def _get_video_timestamp_map(video_id: str, map_dir: str | Path | None = None) -> TimestampMap:
     clean_vid = video_id.strip()
-    if clean_vid in _PTS_CACHE:
-        return _PTS_CACHE[clean_vid]
-
     roots = [
         Path(map_dir) if map_dir else Path(DEFAULT_MAP_KEYFRAMES),
         Path(DEFAULT_MAP_KEYFRAMES),
@@ -738,24 +735,17 @@ def get_single_video_pts_map(video_id: str, map_dir: str | Path | None = None) -
         ]
         for c in candidates:
             if c.exists() and c.is_file():
-                pts_map: dict[int, float] = {}
                 try:
-                    with c.open(encoding="utf-8") as fh:
-                        reader = csv.DictReader(fh)
-                        for row in reader:
-                            f_idx = row.get("frame_idx")
-                            pts = row.get("pts_time")
-                            if f_idx and pts:
-                                try:
-                                    pts_map[int(f_idx)] = float(pts)
-                                except ValueError:
-                                    pass
-                    if pts_map:
-                        _PTS_CACHE[clean_vid] = pts_map
-                        return pts_map
-                except Exception:
+                    table = load_timestamp_map(c)
+                    if table.by_frame:
+                        return table
+                except OSError:
                     pass
-    return {}
+    return TimestampMap({}, {})
+
+
+def get_single_video_pts_map(video_id: str, map_dir: str | Path | None = None) -> dict[int, float]:
+    return _get_video_timestamp_map(video_id, map_dir).by_frame
 
 
 def get_frame_timestamp(
@@ -763,10 +753,11 @@ def get_frame_timestamp(
     frame_id: int,
     map_dir: str | Path | None = None,
     default_fps: float = 25.0,
+    keyframe_path: str | Path | None = None,
 ) -> float:
-    pts_map = get_single_video_pts_map(video_id, map_dir)
-    if frame_id in pts_map:
-        return pts_map[frame_id]
+    timestamp = _get_video_timestamp_map(video_id, map_dir).timestamp(frame_id, keyframe_path)
+    if timestamp is not None:
+        return timestamp
     return float(frame_id) / default_fps
 
 
@@ -775,8 +766,9 @@ def get_frame_time_ms(
     frame_id: int,
     map_dir: str | Path | None = None,
     default_fps: float = 25.0,
+    keyframe_path: str | Path | None = None,
 ) -> int:
-    ts = get_frame_timestamp(video_id, frame_id, map_dir, default_fps)
+    ts = get_frame_timestamp(video_id, frame_id, map_dir, default_fps, keyframe_path)
     return int(round(ts * 1000.0))
 
 
@@ -788,15 +780,18 @@ def show_video_dialog(
     keyframes_root: Path | None = None,
     videos_root: str | None = None,
     map_dir: str | None = None,
+    initial_keyframe_path: str | Path | None = None,
 ) -> None:
-    state_key = f"_cur_fid_{video_id}"
+    state_key = f"_cur_fid_{video_id}_{initial_frame_id}_{initial_keyframe_path}"
     if state_key not in st.session_state:
         st.session_state[state_key] = initial_frame_id
     current_fid = st.session_state[state_key]
 
     v_path = resolve_video_file(video_id, videos_root)
-    ts = get_frame_timestamp(video_id, current_fid, map_dir)
     lookup = load_keyframe_lookup(manifest_path) if manifest_path else {}
+    current_path = (initial_keyframe_path if current_fid == initial_frame_id and initial_keyframe_path
+                    else lookup.get((video_id, current_fid)))
+    ts = get_frame_timestamp(video_id, current_fid, map_dir, keyframe_path=current_path)
     video_kf_map = load_video_keyframes(manifest_path)
     all_frames = sorted(set(video_kf_map.get(video_id, [current_fid])))
 
@@ -941,7 +936,8 @@ setInterval(update, 200);
         st.text_input("📋 Chuỗi nộp bài chuẩn BTC (Video, Frame):", value=f"{video_id}, {current_fid}", key=f"txt_cur_val_{video_id}_{current_fid}")
 
     with col_side:
-        kf_path = event_keyframe_file(video_id, current_fid, lookup, keyframes_root or Path("data/processed"))
+        kf_path = (resolve_keyframe_path(str(current_path), keyframes_root or Path("data/processed"))
+                   if current_path else event_keyframe_file(video_id, current_fid, lookup, keyframes_root or Path("data/processed")))
         if kf_path and kf_path.exists():
             st.image(str(kf_path), **_FULL_WIDTH, caption=f"Keyframe: {current_fid} ({format_timestamp(ts)})")
         else:
@@ -976,8 +972,8 @@ setInterval(update, 200);
             for c_idx, fid in enumerate(frames_chunk):
                 idx_key = offset + c_idx
                 with cols[c_idx]:
-                    f_ts = get_frame_timestamp(video_id, fid, map_dir)
                     f_path = event_keyframe_file(video_id, fid, lookup, keyframes_root or Path("data/processed"))
+                    f_ts = get_frame_timestamp(video_id, fid, map_dir, keyframe_path=f_path)
                     is_active = (fid == current_fid)
                     if f_path and f_path.exists():
                         st.image(str(f_path), **_FULL_WIDTH)
@@ -1039,8 +1035,8 @@ def _render_finals_submission_dock(
 
     vid = target_item.video_id
     fid = target_item.frame_id
-    ms = get_frame_time_ms(vid, fid, map_dir)
-    ts = get_frame_timestamp(vid, fid, map_dir)
+    ms = get_frame_time_ms(vid, fid, map_dir, keyframe_path=target_item.keyframe_path)
+    ts = get_frame_timestamp(vid, fid, map_dir, keyframe_path=target_item.keyframe_path)
     ts_fmt = format_timestamp(ts)
 
     # Chuỗi TRAKE
@@ -1181,8 +1177,8 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
     grid = st.columns(5)
     for pos, (idx, item) in enumerate(visible):
         path = keyframe_file(item, root)
-        ts = get_frame_timestamp(item.video_id, item.frame_id, map_dir)
-        time_ms = get_frame_time_ms(item.video_id, item.frame_id, map_dir)
+        ts = get_frame_timestamp(item.video_id, item.frame_id, map_dir, keyframe_path=item.keyframe_path)
+        time_ms = get_frame_time_ms(item.video_id, item.frame_id, map_dir, keyframe_path=item.keyframe_path)
         is_sel = idx in selected
         sel_order = (selected.index(idx) + 1) if is_sel else None
 
@@ -1220,6 +1216,7 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                     show_video_dialog(
                         video_id=item.video_id,
                         initial_frame_id=item.frame_id,
+                        initial_keyframe_path=item.keyframe_path,
                         manifest_path=manifest_path,
                         keyframes_root=root,
                         videos_root=videos_root,
@@ -1284,7 +1281,7 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
             for ev_idx, (col, frame_id) in enumerate(zip(cols, event_frames)):
                 path = event_keyframe_file(item.video_id, frame_id, lookup, root)
                 ev_text = query.events[ev_idx] if ev_idx < len(query.events) else f"Hành động {ev_idx + 1}"
-                ev_ts = get_frame_timestamp(item.video_id, frame_id, map_dir)
+                ev_ts = get_frame_timestamp(item.video_id, frame_id, map_dir, keyframe_path=path)
                 with col:
                     st.markdown(
                         f'<div style="font-size:0.78rem; font-weight:800; color:var(--text-main); background:var(--meta-bg); '
@@ -1307,6 +1304,7 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
                         show_video_dialog(
                             video_id=item.video_id,
                             initial_frame_id=frame_id,
+                            initial_keyframe_path=path,
                             manifest_path=manifest_path,
                             keyframes_root=root,
                             videos_root=videos_root,
@@ -1706,6 +1704,7 @@ else:
                 show_video_dialog(
                     video_id=top_cand.video_id,
                     initial_frame_id=top_cand.frame_id,
+                    initial_keyframe_path=top_cand.keyframe_path,
                     manifest_path=st.session_state.get("manifest_path", active_manifest),
                     keyframes_root=root,
                     videos_root=st.session_state.get("cfg_videos_root", active_videos_root),
