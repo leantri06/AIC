@@ -1,6 +1,20 @@
 # Memory dự án — đọc đầu mỗi phiên
 
-Cập nhật: 2026-09-24 (Asia/Saigon).
+Cập nhật: 2026-09-25 (Asia/Saigon).
+
+
+## Quyết định mới nhất — 2026-09-25 (ưu tiên hơn lịch sử bên dưới)
+
+- Người dùng xác nhận: **Ứng dụng đã chạy thành công thực tế** trên keyframe chính thức BTC + SigLIP2 SO400M-14-378 / webli.
+- Tinh giản toàn diện repository: gỡ bỏ toàn bộ code dư thừa không còn sử dụng:
+  + Gỡ các script giải nén (`extract_batch2.py`, `extract_keyframes_cpu.py`).
+  + Gỡ bộ Kaggle pipeline (`kaggle/`, `prepare_kaggle_batch2.py`, `merge_kaggle_batch2.py`, `prepare_kaggle_full.bat`, `docs/KAGGLE_BATCH2.md`).
+  + Gỡ các script benchmark/tải batch2 cũ và toàn bộ thư mục unit tests (`tests/`).
+  + Giữ lại script kiểm tra index/dữ liệu: `scripts/audit_siglip2.py`.
+- Toàn bộ backend, CLI, UI và paths chỉ tập trung vào visual-only SigLIP2 + keyframe BTC.
+- Dọn dẹp cấu hình repository: `.gitignore`, `pyproject.toml`, `README.md`.
+- Sẵn sàng đồng bộ toàn bộ codebase lên GitHub repository.
+
 
 ## Thỏa thuận với người dùng
 
@@ -357,3 +371,17 @@ Cập nhật: 2026-09-24 (Asia/Saigon).
   trùng khi create đã thành công; dùng từng nhóm ~8 GiB thay vì gom cả bộ
   trong một lần, nếu vẫn lỗi lấy status/response request lỗi trong Network.
   Không đề nghị xóa/reset upload lớn trước khi kiểm tra trạng thái máy chủ.
+
+## Tinh giản codebase và cập nhật Git 2026-09-25
+
+- Người dùng xác nhận ứng dụng đã chạy thành công trên máy local.
+- Tiến hành dọn dẹp các thành phần không còn cần thiết:
+  + Xóa toàn bộ thư mục `kaggle/` và các scripts liên quan (`prepare_kaggle_batch2.py`, `merge_kaggle_batch2.py`, `prepare_kaggle_full.bat`, `docs/KAGGLE_BATCH2.md`).
+  + Xóa các script giải nén và trích keyframe CPU (`extract_batch2.py`, `extract_keyframes_cpu.py`, `docs/CPU_KEYFRAMES.md`).
+  + Xóa các script tải/benchmark cũ (`download_batch2.py`, `benchmark_batch2_embeddings.py`, `benchmark_transnetv2.py`, `run_transnetv2_batch.py`, `audit_batch2.py`, `docs/BATCH2_EMBEDDING_TRIAL.md`, `docs/TRANSNET_BENCHMARK.md`).
+  + Xóa toàn bộ thư mục `tests/` và cấu hình testpaths trong `pyproject.toml`.
+  + Giữ lại script kiểm tra tính hợp lệ của index BTC: `scripts/audit_siglip2.py`.
+  + Dọn dẹp các script scratch tạm ở thư mục gốc ngoài repo.
+- Thêm `.ruff_cache/` vào `.gitignore`.
+- Cập nhật `README.md` và `MEMORY.md`.
+- Sẵn sàng stage, commit và push lên nhánh `main` trên GitHub.

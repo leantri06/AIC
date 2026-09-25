@@ -1,54 +1,18 @@
 @echo off
-title PEGASUS AI Challenge 2026
+title PEGASUS - SigLIP2
 cd /d "%~dp0"
-
-echo ================================================================
-echo    PEGASUS - Video Retrieval AI Challenge 2026
-echo    Dang khoi dong ung dung Web UI...
-echo ================================================================
-echo.
-
-set "PATH=%PATH%;E:\Anaconda3\Scripts;E:\Anaconda3;%USERPROFILE%\.cargo\bin"
+set "PYTHONPATH=%~dp0src;%PYTHONPATH%"
 set "KMP_DUPLICATE_LIB_OK=TRUE"
 set "OMP_NUM_THREADS=1"
 set "MKL_NUM_THREADS=1"
-set "OPENBLAS_NUM_THREADS=1"
-set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
-if exist "D:\bachkhoa\ai_challenge\data" (
-    set "HF_HOME=D:\bachkhoa\ai_challenge\data\.cache\huggingface"
-    set "TORCH_HOME=D:\bachkhoa\ai_challenge\data\.cache\torch"
-    set "UV_CACHE_DIR=D:\bachkhoa\ai_challenge\data\.cache\uv"
-    set "PIP_CACHE_DIR=D:\bachkhoa\ai_challenge\data\.cache\pip"
+if not defined AIC_DATA_ROOT set "AIC_DATA_ROOT=%~dp0..\data"
+if not defined HF_HOME set "HF_HOME=%AIC_DATA_ROOT%\.cache\huggingface"
+if not defined TORCH_HOME set "TORCH_HOME=%AIC_DATA_ROOT%\.cache\torch"
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" -m streamlit run src/aic2026/app/ui.py --server.port 8501 --server.address 127.0.0.1 --server.headless false --server.fileWatcherType none
 ) else (
-    set "HF_HOME=D:\ai_challenge\data\.cache\huggingface"
-    set "TORCH_HOME=D:\ai_challenge\data\.cache\torch"
-    set "UV_CACHE_DIR=D:\ai_challenge\data\.cache\uv"
-    set "PIP_CACHE_DIR=D:\ai_challenge\data\.cache\pip"
-)
-set "PYTHONPATH=src;%PYTHONPATH%"
-
-:: 1. Uu tien dung uv run
-where uv >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [*] Khoi dong bang uv...
-    uv run streamlit run src/aic2026/app/ui.py --server.port 8501 --server.headless false --server.fileWatcherType none --server.enableWebsocketCompression false --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false
-    goto finish
-)
-
-:: 2. Dung moi truong ao .venv
-if exist ".venv\Scripts\streamlit.exe" (
-    echo [*] Khoi dong bang .venv...
-    .venv\Scripts\streamlit.exe run src/aic2026/app/ui.py --server.port 8501 --server.headless false --server.fileWatcherType none --server.enableWebsocketCompression false --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false
-    goto finish
-)
-
-:: 3. Dung python he thong
-echo [*] Khoi dong bang python he thong...
-python -m streamlit run src/aic2026/app/ui.py --server.port 8501 --server.headless false --server.fileWatcherType none --server.enableWebsocketCompression false --browser.gatherUsageStats false --server.enableCORS false --server.enableXsrfProtection false
-
-:finish
-if %errorlevel% neq 0 (
-    echo.
-    echo [!] Chuong trinh dung voi ma loi: %errorlevel%
+    echo Missing .venv. See README.md for installation instructions.
     pause
+    exit /b 1
 )
+if errorlevel 1 pause

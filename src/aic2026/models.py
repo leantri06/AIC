@@ -37,14 +37,7 @@ class FrameRecord(BaseModel):
     object_path: str | Path | None = None
     metadata_path: str | None = None
     clip_feature_index: int | None = None
-    # Set True once OCR text has been merged into ``object_labels`` for this
-    # frame. Lets ``ocr-manifest --resume`` skip already-finished frames so an
-    # interrupted (or partial) run can continue without redoing work. Defaults
-    # to False so legacy manifests on disk still load.
-    ocr_done: bool = False
-    # ASR speech transcripts corresponding to this keyframe's timestamp.
-    asr_text: list[str] = Field(default_factory=list)
-    asr_done: bool = False
+
 
 
 class Candidate(BaseModel):

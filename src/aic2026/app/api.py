@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import HTMLResponse
@@ -61,7 +62,7 @@ class RuntimeConfig(BaseModel):
     """Cấu hình nội bộ; UI gửi để backend nạp đúng index/encoder."""
     manifest_path: str | None = None
     features_path: str | None = None
-    clip_model: str = "ViT-SO400M-14-SigLIP-384"
+    clip_model: Literal["siglip2", "ViT-SO400M-14-SigLIP2-378"] = "siglip2"
     clip_pretrained: str = "webli"
     llm_model: str = "qwen3.5:4b"
     ollama_url: str = "http://127.0.0.1:11434"
@@ -72,7 +73,7 @@ class RuntimeConfig(BaseModel):
     late_interaction_weight: float = 0.0
     metadata_filter: str = ""
     translate_query: bool = False
-    search_mode: str = "hybrid"
+    search_mode: Literal["siglip"] = "siglip"
     vlm_backend: str = "none"
     vlm_model: str = "microsoft/Florence-2-base-ft"
     vlm_device: str | None = None
@@ -123,7 +124,7 @@ def load_orchestrator(
     chroma_dir: str = "data/indexes/chroma",
     metadata_filter: str = "",
     translate_query: bool = False,
-    vlm_backend: str = "florence",
+    vlm_backend: str = "none",
     late_interaction_weight: float = 0.0,
     vlm_model: str = "microsoft/Florence-2-base-ft",
     vlm_device: str | None = None,
@@ -131,7 +132,7 @@ def load_orchestrator(
     vlm_timeout: int = 120,
     coarse_top_k: int = 200,
     query_type: str | None = None,
-    clip_model: str = "ViT-SO400M-14-SigLIP-384",
+    clip_model: Literal["siglip2", "ViT-SO400M-14-SigLIP2-378"] = "siglip2",
     vlm_judge_enabled: bool = False,
     vlm_judge_model: str = "Qwen/Qwen2.5-VL-7B-Instruct",
     vlm_judge_backend: str = "qwen",
@@ -151,11 +152,7 @@ def load_orchestrator(
     manifest_file, features_file = resolve_feature_sources(manifest_path, features_path)
     missing = [str(path) for path in (manifest_file, features_file) if not path.exists()]
     if missing:
-        hint = (
-            "Thiếu index retrieval. Ưu tiên official_features.npy (CLIP sẵn BTC, "
-            "sinh bởi `aic2026 prepare-official`); fallback derived_features.npy "
-            "(sinh bởi `aic2026 embed-keyframes`). Chạy một trong hai lệnh trên."
-        )
+        hint = "Cần cặp siglip2_manifest.jsonl và siglip2_features.npy đã embed sẵn."
         raise FileNotFoundError(f"Thiếu index retrieval: {', '.join(missing)}. {hint}")
     manifest_records = load_manifest(manifest_file)
     # Per-video metadata (title/description/keywords) sống cùng thư mục với
@@ -174,46 +171,20 @@ def load_orchestrator(
         chroma_dir=chroma_dir,
     )
 
-    # Auto-detect Dense Semantic ASR features (BGE-M3 1024-dim)
-    import numpy as np
-    asr_dense_file = None
-    for cand_asr in (
-        manifest_file.parent / "asr_dense_features.npy",
-        Path(r"D:\bachkhoa\ai_challenge\data\processed\asr_dense_features.npy"),
-        Path(r"D:\ai_challenge\data\processed\asr_dense_features.npy"),
-        Path("data/processed/asr_dense_features.npy"),
-    ):
-        if cand_asr.exists():
-            asr_dense_file = cand_asr
-            break
-
-    asr_features = None
-    if asr_dense_file is not None:
-        try:
-            asr_features = np.load(asr_dense_file, mmap_mode="r")
-            logger.info("Loaded Dense ASR features %s from %s (mmap)", asr_features.shape, asr_dense_file)
-        except Exception as exc:
-            logger.warning("Failed to load asr_dense_features from %s: %s", asr_dense_file, exc)
-
     pipeline = RetrievalPipeline(
         index,
         manifest_records,
         frames_per_video=20,
         video_metadata=video_metadata,
-        asr_features=asr_features,
     )
     text_encoder = OpenCLIPTextEmbedder(model_name=clip_model, pretrained=clip_pretrained)
     tools = RetrievalTools(
-        pipeline, text_encoder.encode, encode_images=text_encoder.encode_images
+        pipeline, text_encoder.encode, rerank_weight=0.0, object_evidence_weight=0.0,
+        colour_rerank_weight=0.0, contrastive_colour_rerank_weight=0.0
     )
     tools.coarse_top_k = coarse_top_k
     tools.video_filter_terms = [t.strip() for t in metadata_filter.split(",") if t.strip()] or None
     tools.late_interaction_weight = late_interaction_weight
-    # Objects are frame-specific and useful for lexical retrieval.  Video
-    # metadata is deliberately excluded: it is near-duplicate across frames and
-    # adds memory/IDF noise without improving frame selection.
-    from aic2026.retrieval import BM25Index
-    tools.bm25_index = BM25Index.get_or_create(manifest_file, manifest_records)
     # Pass the VLM model id to tools; it is built lazily ONLY on the QA answer
     # step (after the CLIP encoder is freed) so CLIP + Florence are never both
     # resident (avoids OOM). For KIS/TRAKE we force "none" so the VLM is never
@@ -351,7 +322,7 @@ def run_qa(request: TaskRequest) -> AgentResult:
 
 @app.post("/tasks/qa/candidates", response_model=AgentResult)
 def run_qa_candidates(request: TaskRequest) -> AgentResult:
-    """Phase-1 QA: chỉ retrieval (CLIP + BM25), không VLM. Trả candidates ngay.
+    """Phase-1 QA: chỉ retrieval (SigLIP2), không VLM. Trả candidates ngay.
 
     UI gọi endpoint này trước: hiển thị gallery ảnh ngay (giống KIS), sau đó mới
     gọi /tasks/qa/answers để điền đáp án từ VLM mà không block UI.

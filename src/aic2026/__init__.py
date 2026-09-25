@@ -8,14 +8,9 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-data_root = None
-for candidate in [
-    r"D:\bachkhoa\ai_challenge\data",
-    r"D:\ai_challenge\data",
-]:
-    if os.path.exists(candidate):
-        data_root = candidate
-        break
+from .paths import default_data_root
+
+data_root = str(default_data_root())
 
 if data_root:
     cache_dir = os.path.join(data_root, ".cache")

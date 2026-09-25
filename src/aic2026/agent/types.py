@@ -10,18 +10,9 @@ Action = Literal["retrieve", "align_events", "answer_question", "finish"]
 
 
 class ModalityDecomposition(BaseModel):
-    """Decomposition of a user query across Visual, OCR, and ASR modalities.
-
-    Based on 'Unified Interactive Multimodal Moment Retrieval' (AAAI 2026).
-    """
-
-    visual_query: str = Field(description="Visual action, scene, objects, or colors")
-    ocr_query: str = Field(default="", description="On-screen text, signs, logos, numbers")
-    asr_query: str = Field(default="", description="Spoken dialogue, speech keywords, narration")
-    w_vis: float = Field(default=0.6, ge=0.0, le=1.0, description="Visual modality weight")
-    w_ocr: float = Field(default=0.2, ge=0.0, le=1.0, description="OCR modality weight")
-    w_asr: float = Field(default=0.2, ge=0.0, le=1.0, description="ASR modality weight")
-    reason: str = Field(default="", max_length=500, description="Reason for modality weight assignment")
+    """The visual query used by the SigLIP2 encoder."""
+    visual_query: str
+    w_vis: Literal[1.0] = 1.0
 
 
 class VisualQueryFacets(BaseModel):

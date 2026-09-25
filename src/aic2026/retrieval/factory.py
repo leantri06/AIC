@@ -97,4 +97,6 @@ def load_index_for_query(
             f"'.npy' or a regenerated manifest usually causes this; rebuild both "
             f"from the same source with `prepare-official`."
         )
+    if any(record.vector_id != row for row, record in enumerate(manifest)):
+        raise ValueError("Manifest vector_id must equal its feature row index; index is misaligned.")
     return VectorIndex.from_npy(features, mmap=True)

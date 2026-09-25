@@ -1,4 +1,3 @@
-from .asr import ASRExtractor
 from .organizer_assets import OrganizerAssets, extract_support_archives, inspect_official_assets
 from .video_frames import (
     ExtractionReport,
@@ -9,7 +8,6 @@ from .video_frames import (
 )
 
 __all__ = [
-    "ASRExtractor",
     "ExtractionReport",
     "OpenCLIPFrameEncoder",
     "OrganizerAssets",

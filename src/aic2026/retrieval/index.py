@@ -48,7 +48,11 @@ class VectorIndex:
             # norms (177k × 4 B ≈ 0.7 MB) so cosine can be recovered as (v·q)/‖v‖
             # without ever materialising the full matrix in RAM.
             self._faiss = None
-            self._norms = np.linalg.norm(self.vectors, axis=1).astype(np.float32)
+            self._norms = np.empty(len(self.vectors), dtype=np.float32)
+            for start in range(0, len(self.vectors), 8192):
+                self._norms[start:start + 8192] = np.linalg.norm(
+                    self.vectors[start:start + 8192], axis=1
+                )
 
     @classmethod
     def from_npy(cls, path: Path, mmap: bool = True) -> VectorIndex:

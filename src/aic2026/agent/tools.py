@@ -6,7 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -25,8 +24,6 @@ from aic2026.reranking import (
 from aic2026.retrieval import RetrievalPipeline
 from aic2026.temporal import align_events, refine_trake_candidates
 
-if TYPE_CHECKING:
-    from aic2026.retrieval.bm25_index import BM25Index
 
 
 _TASKS_REQUIRING_DENSE_VIDEO_EVIDENCE = frozenset(
@@ -73,13 +70,11 @@ class RetrievalTools:
     temporal_nms_enabled: bool = False
     temporal_nms_window: int = 60
     temporal_nms_max_per_video: int = 3
-    asr_embedder_obj: Any | None = None
     encode_images: Callable[[list[object]], np.ndarray] | None = None
-    bm25_index: BM25Index | None = None
     # Trọng số metadata bonus (Direction B): nhỏ, cộng trực tiếp lên RRF gốc
     # (KHÔNG normalize). RRF base ~0.01-0.03; weight 0.01 → bonus tối đa +0.01,
     # đủ nudging mà không đảo ngược thứ tự RRF.
-    rerank_weight: float = 0.01
+    rerank_weight: float = 0.0
     # Asymmetry of the object-evidence signal (KIS).  A frame shown by the
     # detector to LACK every object the query asks for is penalized
     # `object_evidence_weight * object_penalty_scale`, while a full match is only
@@ -88,7 +83,7 @@ class RetrievalTools:
     object_penalty_scale: float = 2.0
     # Base magnitude of the object-evidence reward/penalty (KIS).  On the RRF
     # scale (~0.0018–0.016) a value of 0.02–0.05 is a strong but bounded nudge.
-    object_evidence_weight: float = 0.03
+    object_evidence_weight: float = 0.0
     # Hard-drop frames that have NO object labels at all (ingest marked them as
     # blurry / no-clear-object, i.e. no entity reached the 0.4 present-threshold)
     # WHEN the query actually asks for an object.  This is the "blurry frame"
@@ -103,8 +98,8 @@ class RetrievalTools:
     late_interaction_weight: float = 0.0
     # HSV colour evidence reads only the top image candidates and never calls a
     # VLM.  It is deliberately bounded so CLIP remains the primary signal.
-    colour_rerank_weight: float = 0.08
-    contrastive_colour_rerank_weight: float = 0.06
+    colour_rerank_weight: float = 0.0
+    contrastive_colour_rerank_weight: float = 0.0
     colour_sidecar_path: str | None = None
     # Restrict retrieval to a dataset split by video_id prefix (e.g. ``["L25"]``
     # for QA on online-course videos, ``["L26"]`` for TRAKE). Optional; when set
@@ -140,8 +135,8 @@ class RetrievalTools:
 
     @property
     def has_lexical_objects(self) -> bool:
-        """Whether a frame-level objects/OCR BM25 index is available."""
-        return self.bm25_index is not None and not self.bm25_index.is_empty
+        """Visual retrieval does not use a lexical index."""
+        return False
 
     def retrieve(
         self,
@@ -156,7 +151,7 @@ class RetrievalTools:
         Supports:
         - Tầng 2: GQE Multi-Facet Decomposition (q_core, q_entity, q_action, q_scene).
         - Tầng 3: Score-Reflected Reciprocal Rank Fusion (SRRF).
-        - Adaptive Multimodal Score Fusion (AAAI 2026) across Visual (CLIP), OCR, and ASR.
+        - SigLIP2 visual retrieval over the precomputed keyframes.
         """
 
         if limit <= 0:
@@ -198,44 +193,9 @@ class RetrievalTools:
                 f" prefixes={self.video_prefixes}" if self.video_prefixes else "",
             )
 
-        if self.bm25_index is not None and self.bm25_index.is_empty:
-            logger.warning(
-                "BM25 skipped: manifest has no Objects/Metadata text. "
-                "Run `aic2026 prepare` to load them for lexical retrieval."
-            )
-
-        # Bound the retrieval work to the requested candidate pool.  A global
-        # per-video scan is disproportionately expensive for a static CLIP index.
         pool = limit
 
-        if self.bm25_index is not None and not self.bm25_index.is_empty:
-            logger.debug("Adaptive multimodal retrieval active; fusing Visual, OCR, and ASR.")
-            vis_q = modality.visual_query if modality and modality.visual_query else queries[0]
-            ocr_q = modality.ocr_query if modality else ""
-            asr_q = modality.asr_query if modality else ""
-            w_vis = modality.w_vis if modality else 0.6
-            w_ocr = modality.w_ocr if modality else 0.2
-            w_asr = modality.w_asr if modality else 0.2
-
-            if w_asr > 0 and self.pipeline.asr_features is not None:
-                self.ensure_asr_embedder()
-
-            # Pass multi-facet embeddings for SRRF visual fusion when available
-            vis_emb_input = embeddings if len(embeddings) > 1 else embeddings[0]
-
-            candidates = self.pipeline.adaptive_multimodal_retrieve_raw(
-                visual_query=vis_q,
-                text_embedding=vis_emb_input,
-                bm25_index=self.bm25_index,
-                ocr_query=ocr_q,
-                asr_query=asr_q,
-                w_vis=w_vis,
-                w_ocr=w_ocr,
-                w_asr=w_asr,
-                top_frames=pool,
-                video_ids=allowed_video_ids,
-            )
-        elif requires_dense_evidence:
+        if requires_dense_evidence:
             candidates = self.pipeline.retrieve_raw(
                 text_embedding=embeddings[0],
                 top_frames=pool,
@@ -313,7 +273,7 @@ class RetrievalTools:
         # thực sự chứa ĐỦ toàn bộ corpus: Chroma nếu chỉ build 1 phần (thiếu mấy
         # chục nghìn vector) thì vector_id sẽ lệch → skip an toàn, fallback về
         # RRF + metadata bonus, không crash.
-        if self.encode_text is not None and candidates:
+        if self.late_interaction_weight > 0 and self.encode_text is not None and candidates:
             index = getattr(self.pipeline, "index", None)
             index_has_all = index is not None
             manifest_size = len(self.pipeline.manifest) if self.pipeline.manifest is not None else 0
@@ -685,28 +645,7 @@ class RetrievalTools:
             except Exception as exc:
                 logger.warning("close_vlm_judge: failed to close: %s", exc)
 
-    def ensure_asr_embedder(self) -> Any | None:
-        """Lazily initialize the Dense ASR embedder (BGE-M3) if ASR features are loaded."""
-        if self.asr_embedder_obj is not None:
-            return self.asr_embedder_obj
-        if self.pipeline.asr_features is None:
-            return None
-        try:
-            from aic2026.embeddings.asr import BGEM3TextEmbedder
-            self.asr_embedder_obj = BGEM3TextEmbedder(device="cpu")
-            self.pipeline.encode_asr = self.asr_embedder_obj.encode
-            return self.asr_embedder_obj
-        except Exception as exc:
-            logger.warning("ensure_asr_embedder: failed to load BGEM3TextEmbedder: %s", exc)
-            return None
 
-    def close_asr_embedder(self) -> None:
-        """Free ASR embedder GPU memory."""
-        if self.asr_embedder_obj is not None and hasattr(self.asr_embedder_obj, "unload"):
-            try:
-                self.asr_embedder_obj.unload()
-            except Exception as exc:
-                logger.warning("close_asr_embedder: failed: %s", exc)
 
     def rerank_with_vlm_judge(
         self,

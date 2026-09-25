@@ -15,12 +15,6 @@ os.environ["STREAMLIT_SERVER_ENABLE_WEBSOCKET_COMPRESSION"] = "false"
 os.environ["STREAMLIT_SERVER_ENABLE_CORS"] = "false"
 os.environ["STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION"] = "false"
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-if os.path.exists(r"D:\bachkhoa\ai_challenge\data"):
-    os.environ.setdefault("HF_HOME", r"D:\bachkhoa\ai_challenge\data\.cache\huggingface")
-elif os.path.exists(r"D:\ai_challenge\data"):
-    os.environ.setdefault("HF_HOME", r"D:\ai_challenge\data\.cache\huggingface")
 
 import csv
 import html
@@ -36,6 +30,7 @@ from pydantic import ValidationError
 
 from aic2026.ingestion import load_manifest
 from aic2026.models import Candidate, Query
+from aic2026.paths import default_data_root, resolve_data_root_and_paths, resolve_keyframe
 from aic2026.submission import competition_answer, csv_row
 
 import re as _re
@@ -75,96 +70,7 @@ def _detect_default_path(candidates: list[str]) -> str:
     return candidates[0]
 
 
-DEFAULT_MASTER_ROOT = _detect_default_path([
-    r"D:\bachkhoa\ai_challenge",
-    r"D:\bachkhoa\ai_challenge\data",
-    r"D:\ai_challenge",
-    r"D:\ai_challenge\data",
-    "data",
-])
-
-
-def resolve_data_root_and_paths(base_str: str, model_choice: str = "siglip2") -> dict[str, str]:
-    """
-    Tự động suy luận toàn bộ các đường dẫn con từ 1 đường dẫn gốc duy nhất và lựa chọn mô hình.
-    """
-    cleaned = (base_str or "").strip(" '\"")
-    base = Path(cleaned) if cleaned else Path("data")
-    
-    if (base / "data").exists() and (base / "data").is_dir():
-        data_dir = base / "data"
-    else:
-        data_dir = base
-
-    model_configs = {
-        "siglip2": {
-            "clip_model": "siglip2",
-            "clip_pretrained": "webli",
-            "manifest_names": ["siglip2_manifest.jsonl", "siglip_manifest.jsonl", "derived_manifest.jsonl", "official_manifest.jsonl"],
-            "feature_names": ["siglip2_features.npy", "siglip_features.npy", "derived_features.npy", "official_features.npy"],
-        },
-        "siglip": {
-            "clip_model": "siglip",
-            "clip_pretrained": "webli",
-            "manifest_names": ["siglip_manifest.jsonl", "siglip2_manifest.jsonl", "derived_manifest.jsonl", "official_manifest.jsonl"],
-            "feature_names": ["siglip_features.npy", "siglip2_features.npy", "derived_features.npy", "official_features.npy"],
-        },
-        "siglip2-base": {
-            "clip_model": "siglip2-base",
-            "clip_pretrained": "webli",
-            "manifest_names": ["siglip2_base_manifest.jsonl", "siglip2_manifest.jsonl", "siglip_manifest.jsonl", "derived_manifest.jsonl"],
-            "feature_names": ["siglip2_base_features.npy", "siglip2_features.npy", "siglip_features.npy", "derived_features.npy"],
-        },
-        "clip-l14": {
-            "clip_model": "ViT-L-14",
-            "clip_pretrained": "openai",
-            "manifest_names": ["derived_manifest.jsonl", "official_manifest.jsonl", "clip_manifest.jsonl", "siglip2_manifest.jsonl"],
-            "feature_names": ["derived_features.npy", "official_features.npy", "clip_features.npy", "siglip2_features.npy"],
-        },
-    }
-    
-    cfg = model_configs.get(model_choice, model_configs["siglip2"])
-
-    manifest_candidates = [data_dir / "processed" / name for name in cfg["manifest_names"]]
-    manifest = next((c for c in manifest_candidates if c.exists()), manifest_candidates[0])
-
-    feature_candidates = [data_dir / "processed" / name for name in cfg["feature_names"]]
-    features = next((c for c in feature_candidates if c.exists()), feature_candidates[0])
-
-    asr_dense = data_dir / "processed" / "asr_dense_features.npy"
-
-    kf_candidates = [
-        data_dir / "extracted" / "Keyframes",
-        data_dir / "extracted",
-        data_dir / "raw" / "Keyframes",
-    ]
-    keyframes = next((c for c in kf_candidates if c.exists()), kf_candidates[0])
-
-    vid_candidates = [
-        data_dir / "extracted" / "Videos",
-        data_dir / "Videos",
-        data_dir / "raw" / "Videos",
-    ]
-    videos = next((c for c in vid_candidates if c.exists()), vid_candidates[0])
-
-    map_candidates = [
-        data_dir / "extracted" / "map-keyframes",
-        data_dir / "map-keyframes",
-        data_dir / "raw" / "map-keyframes",
-    ]
-    map_keyframes = next((c for c in map_candidates if c.exists()), map_candidates[0])
-
-    return {
-        "data_dir": str(data_dir),
-        "manifest": str(manifest),
-        "features": str(features),
-        "asr_features": str(asr_dense),
-        "keyframes": str(keyframes),
-        "videos": str(videos),
-        "map_keyframes": str(map_keyframes),
-        "clip_model": cfg["clip_model"],
-        "clip_pretrained": cfg["clip_pretrained"],
-    }
+DEFAULT_MASTER_ROOT = str(default_data_root())
 
 
 # Initial default paths
@@ -174,7 +80,6 @@ DEFAULT_FEATURES = _INIT_PATHS["features"]
 DEFAULT_ROOT = _INIT_PATHS["keyframes"]
 DEFAULT_VIDEOS_ROOT = _INIT_PATHS["videos"]
 DEFAULT_MAP_KEYFRAMES = _INIT_PATHS["map_keyframes"]
-DEFAULT_ASR_FEATURES = _INIT_PATHS["asr_features"]
 DEFAULT_CLIP_MODEL = _INIT_PATHS["clip_model"]
 DEFAULT_CLIP_PRETRAINED = _INIT_PATHS["clip_pretrained"]
 
@@ -185,7 +90,7 @@ st.set_page_config(page_title="PEGASUS AI Challenge 2026", layout="wide", page_i
 if "query_type" not in st.session_state:
     st.session_state["query_type"] = "kis"
 if "search_mode" not in st.session_state:
-    st.session_state["search_mode"] = "hybrid"
+    st.session_state["search_mode"] = "siglip"
 if "selected_model_choice" not in st.session_state:
     st.session_state["selected_model_choice"] = "siglip2"
 if "app_theme" not in st.session_state:
@@ -280,6 +185,20 @@ html, body, [data-testid="stAppViewContainer"] {{
 /* Typography fixes */
 h1, h2, h3, h4, h5, p, span, label {{
   color: var(--text-main);
+}}
+[data-testid="stHeader"] {{ background: var(--bg-main); }}
+button[data-testid="stBaseButton-secondary"],
+[data-testid="stSegmentedControl"] button,
+[data-testid="stSelectbox"] [role="combobox"] {{
+  background: var(--input-bg); color: var(--text-main);
+  border-color: var(--input-border);
+}}
+button[data-testid="stBaseButton-secondary"]:hover {{ border-color: #818cf8; }}
+[data-testid="stSegmentedControl"] button[aria-checked="true"] {{
+  background: #4338ca; color: white;
+}}
+button[data-testid="stBaseButton-primaryFormSubmit"] {{
+  background: #4f46e5; color: white; border-color: #6366f1;
 }}
 
 /* ---- Header (Sleek Matte Titanium Bar) ---- */
@@ -614,99 +533,30 @@ def build_query(query_type: str, text: str, question: str, events_text: str) -> 
 
 @st.cache_resource(show_spinner=False, max_entries=1)
 def load_all_manifest_tables(manifest_path: str | None):
-    if not manifest_path or not Path(manifest_path).exists():
-        return {}, {}, {}, {}, {}
-
-    keyframe_lookup: dict[tuple[str, int], str] = {}
-    asr_lookup: dict[tuple[str, int], list[str]] = {}
-    ocr_lookup: dict[tuple[str, int], list[str]] = {}
-    by_video: dict[str, list[int]] = defaultdict(list)
-    timelines: dict[str, list[tuple[int, list[str]]]] = defaultdict(list)
-
-    with open(manifest_path, "r", encoding="utf-8") as f:
-        for line in f:
-            if not line.strip():
-                continue
-            rec = json.loads(line)
-            vid = rec.get("video_id")
-            fid = int(rec.get("frame_id", 0))
-            if not vid:
-                continue
-            pair = (vid, fid)
-            kf_path = rec.get("keyframe_path")
-            if kf_path:
-                keyframe_lookup[pair] = kf_path
-            by_video[vid].append(fid)
-            asr = rec.get("asr_text")
-            if asr:
-                asr_lookup[pair] = asr
-                timelines[vid].append((fid, asr))
-            ocr = rec.get("object_labels")
-            if ocr:
-                ocr_lookup[pair] = ocr
-
-    for vid in by_video:
-        by_video[vid] = sorted(set(by_video[vid]))
-    for vid in timelines:
-        timelines[vid].sort(key=lambda x: x[0])
-
-    return keyframe_lookup, asr_lookup, ocr_lookup, dict(by_video), dict(timelines)
+    keyframes = {}
+    by_video = defaultdict(list)
+    if manifest_path and Path(manifest_path).is_file():
+        with open(manifest_path, encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                record = json.loads(line)
+                video, frame = record["video_id"], int(record["frame_id"])
+                keyframes[(video, frame)] = record["keyframe_path"]
+                by_video[video].append(frame)
+    return keyframes, {video: sorted(set(frames)) for video, frames in by_video.items()}
 
 
-def load_keyframe_lookup(manifest_path: str) -> dict[tuple[str, int], str]:
+def load_keyframe_lookup(manifest_path: str):
     return load_all_manifest_tables(manifest_path)[0]
 
 
-def load_asr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
+def load_video_keyframes(manifest_path: str | None):
     return load_all_manifest_tables(manifest_path)[1]
 
 
-def load_ocr_lookup(manifest_path: str) -> dict[tuple[str, int], list[str]]:
-    return load_all_manifest_tables(manifest_path)[2]
-
-
-def load_video_keyframes(manifest_path: str | None) -> dict[str, list[int]]:
-    return load_all_manifest_tables(manifest_path)[3]
-
-
-def load_video_asr_timeline(manifest_path: str, video_id: str) -> list[tuple[int, list[str]]]:
-    timelines = load_all_manifest_tables(manifest_path)[4]
-    return timelines.get(video_id, [])
-
-
 def resolve_keyframe_path(stored_path: str, root: Path) -> Path:
-    path = Path(stored_path)
-    if path.exists():
-        return path
-
-    parts = path.parts
-    rel_candidates: list[Path] = []
-    if "Keyframes" in parts:
-        kf_idx = parts.index("Keyframes")
-        rel_candidates.append(Path(*parts[kf_idx + 1 :]))
-        rel_candidates.append(Path(*parts[kf_idx:]))
-    elif len(parts) >= 2:
-        rel_candidates.append(Path(parts[-2]) / parts[-1])
-
-    rel_candidates.append(path)
-    if len(parts) >= 1:
-        rel_candidates.append(Path(parts[-1]))
-
-    for rel in rel_candidates:
-        for candidate in (
-            root / rel,
-            root / "Keyframes" / rel,
-            Path(r"D:\bachkhoa\ai_challenge\data\extracted\Keyframes") / rel,
-            Path(r"D:\bachkhoa\ai_challenge\data\extracted") / rel,
-            Path(r"D:\ai_challenge\data\extracted\Keyframes") / rel,
-            Path(r"D:\ai_challenge\data\extracted") / rel,
-            Path.cwd() / rel,
-            Path.cwd() / "data" / "extracted" / "Keyframes" / rel,
-            Path.cwd() / "data" / "processed" / rel,
-        ):
-            if candidate.exists():
-                return candidate
-    return root / path.name
+    return resolve_keyframe(stored_path, root)
 
 
 def keyframe_file(candidate: Candidate, root: Path) -> Path | None:
@@ -857,7 +707,6 @@ def show_video_dialog(
     lookup = load_keyframe_lookup(manifest_path) if manifest_path else {}
     video_kf_map = load_video_keyframes(manifest_path)
     all_frames = sorted(set(video_kf_map.get(video_id, [current_fid])))
-    asr_lookup = load_asr_lookup(manifest_path) if manifest_path else {}
 
     st.markdown(
         f"### 📹 Video: `{video_id}` &nbsp;|&nbsp; Frame: `{current_fid}` &nbsp;|&nbsp; ⏱️ **{format_timestamp(ts)}** ({ts:.2f}s)"
@@ -1022,11 +871,8 @@ setInterval(update, 200);
                         st.session_state[state_key] = next_fid
                         st.rerun()
 
-    # Section Tabs: Keyframes & Lời thoại ASR toàn video
     st.markdown("---")
-    tab_kfs, tab_asr = st.tabs([f"🎞️ Keyframes ({len(all_frames)} frames)", "🗣️ Kịch bản Lời thoại ASR Toàn Video"])
-
-    with tab_kfs:
+    with st.container():
         cols_per_row = 6
         curr_idx = all_frames.index(current_fid) if current_fid in all_frames else 0
         start_idx = max(0, curr_idx - 5)
@@ -1067,22 +913,6 @@ setInterval(update, 200);
                 for row_start in range(0, len(all_frames), cols_per_row):
                     _render_kf_row(all_frames[row_start : row_start + cols_per_row], prefix="all", offset=row_start)
 
-    with tab_asr:
-        video_timeline = load_video_asr_timeline(manifest_path, video_id)
-        if not video_timeline:
-            st.caption("Video này không có dữ liệu lời thoại ASR.")
-        else:
-            for fid_asr, texts in video_timeline:
-                asr_ts = get_frame_timestamp(video_id, fid_asr, map_dir)
-                c_t1, c_t2 = st.columns([1, 4])
-                with c_t1:
-                    if st.button(f"⏱️ {format_timestamp(asr_ts)} (f{fid_asr})", key=f"btn_jump_asr_{video_id}_{fid_asr}", **_FULL_WIDTH):
-                        st.session_state[state_key] = fid_asr
-                        st.rerun()
-                with c_t2:
-                    st.markdown(f"🗣️ *{' '.join(texts)}*")
-
-
 # ---------------------------------------------------------------------------
 # Gallery renderers
 # ---------------------------------------------------------------------------
@@ -1102,8 +932,6 @@ def _toggle(idx: int, nonce: int):
 
 def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], root: Path, selected: list[int]) -> None:
     manifest_path = st.session_state.get("manifest_path")
-    asr_lookup = load_asr_lookup(manifest_path) if manifest_path else {}
-    ocr_lookup = load_ocr_lookup(manifest_path) if manifest_path else {}
     map_dir = st.session_state.get("cfg_map_keyframes", DEFAULT_MAP_KEYFRAMES)
     videos_root = st.session_state.get("cfg_videos_root", DEFAULT_VIDEOS_ROOT)
     nonce = int(st.session_state.get("_query_nonce", 0))
@@ -1135,34 +963,11 @@ def _render_frame_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
             else:
                 st.caption("Không có ảnh")
 
-            asr_snippets = asr_lookup.get((item.video_id, item.frame_id), [])
-            asr_html = ""
-            if asr_snippets:
-                joined_asr = " ".join(asr_snippets)
-                short_asr = (joined_asr[:55] + "...") if len(joined_asr) > 55 else joined_asr
-                asr_html = (
-                    f'<div style="font-size:0.72rem; color:#818cf8; background:rgba(99, 102, 241, 0.15); '
-                    f'border-radius:4px; padding:2px 5px; margin-top:3px; line-height:1.2;" '
-                    f'title="{html.escape(joined_asr)}">🗣️ {html.escape(short_asr)}</div>'
-                )
-
-            ocr_labels = ocr_lookup.get((item.video_id, item.frame_id), [])
-            ocr_html = ""
-            if ocr_labels:
-                joined_ocr = ", ".join(ocr_labels[:4])
-                short_ocr = (joined_ocr[:50] + "...") if len(joined_ocr) > 50 else joined_ocr
-                ocr_html = (
-                    f'<div style="font-size:0.72rem; color:#34d399; background:rgba(16, 185, 129, 0.15); '
-                    f'border-radius:4px; padding:2px 5px; margin-top:2px; line-height:1.2;" '
-                    f'title="{html.escape(", ".join(ocr_labels))}">🔤 {html.escape(short_ocr)}</div>'
-                )
-
             st.markdown(
                 f'<div class="card-meta">'
                 f'<span class="card-rank">#{idx + 1}</span> &nbsp;'
                 f'<span class="card-video">{html.escape(item.video_id)}</span> · <b>{item.frame_id}</b>'
-                f"{ocr_html}"
-                f"{asr_html}</div>",
+                "</div>",
                 unsafe_allow_html=True,
             )
 
@@ -1291,7 +1096,7 @@ st.markdown(
     "</div>"
     '<div class="peg-titles">'
     '<h1 class="peg-word">PEGASUS</h1>'
-    '<span class="peg-sub">Video Retrieval AI Challenge 2026</span>'
+    '<span class="peg-sub">SigLIP2 · Keyframe BTC · AI Challenge 2026</span>'
     "</div>"
     "</div>"
     '<span class="peg-badge">🏆 KHÔNG THẮNG THÌ THÔI</span>'
@@ -1315,33 +1120,13 @@ with top_c1:
         label_visibility="collapsed",
     )
 with top_c2:
-    st.markdown('<div class="mini-label">⚡ Chế độ tìm kiếm</div>', unsafe_allow_html=True)
-    search_mode = st.segmented_control(
-        "Chế độ",
-        ["hybrid", "siglip", "asr", "ocr"],
-        format_func=lambda x: {
-            "hybrid": "🌈 Đa kênh",
-            "siglip": "👁️ Thị giác",
-            "asr": "🗣️ Lời thoại",
-            "ocr": "🔤 OCR",
-        }.get(x, x),
-        key="search_mode",
-        label_visibility="collapsed",
-    )
+    st.markdown('<div class="mini-label">👁️ Tìm kiếm hình ảnh</div>', unsafe_allow_html=True)
+    st.markdown("**SigLIP2 · SO400M / 378**")
+    search_mode = "siglip"
 with top_c3:
-    st.markdown('<div class="mini-label">🤖 Mô hình Thị giác</div>', unsafe_allow_html=True)
-    model_choice = st.selectbox(
-        "Mô hình",
-        ["siglip2", "siglip", "clip-l14", "siglip2-base"],
-        format_func=lambda x: {
-            "siglip2": "🚀 SigLIP 2 (SO400M - SOTA)",
-            "siglip": "👁️ SigLIP (SO400M - Chuẩn)",
-            "clip-l14": "🎨 OpenAI CLIP (Derived)",
-            "siglip2-base": "⚡ SigLIP 2 Base (ViT-B-16)",
-        }.get(x, x),
-        key="selected_model_choice",
-        label_visibility="collapsed",
-    )
+    st.markdown('<div class="mini-label">🎞️ Nguồn keyframe</div>', unsafe_allow_html=True)
+    st.markdown("**Keyframe chính thức BTC**")
+    model_choice = "siglip2"
 with top_c4:
     st.markdown('<div class="mini-label">🌓 Giao diện</div>', unsafe_allow_html=True)
     theme_choice = st.selectbox(
@@ -1410,7 +1195,7 @@ with chip_col2:
         on_click=apply_preset_query,
         kwargs={
             "q_type": "kis",
-            "s_mode": "hybrid",
+            "s_mode": "siglip",
             "q_text": "Một đầu bếp chế biến món ăn trong chảo, với các miếng dồi trường màu trắng và rau xanh. Đầu bếp cho bông hẹ vào chảo.",
             "translate": True,
             "model": "siglip2",
@@ -1424,7 +1209,7 @@ with chip_col3:
         on_click=apply_preset_query,
         kwargs={
             "q_type": "trake",
-            "s_mode": "hybrid",
+            "s_mode": "siglip",
             "q_events": "Một chiếc xe cứu thương màu trắng di chuyển trên đường phố đông đúc.\nXe cứu thương rẽ vào cổng bệnh viện lớn.\nCác nhân viên y tế mở cửa sau xe đẩy cáng cứu thương vào bên trong.",
             "translate": True,
             "model": "siglip2",
@@ -1433,32 +1218,25 @@ with chip_col3:
     )
 with chip_col4:
     st.button(
-        "🗣️ Lời thoại ASR",
-        key="chip_asr_news",
+        "🌉 Cảnh sông (KIS)",
+        key="chip_river",
         on_click=apply_preset_query,
         kwargs={
             "q_type": "kis",
-            "s_mode": "asr",
-            "q_text": "bản tin thời sự thông báo sạt lở bờ sông",
+            "s_mode": "siglip",
+            "q_text": "A wide river with houses and green trees along the riverbank",
             "model": "siglip2",
         },
         **_FULL_WIDTH,
     )
 # Tùy chọn Tăng Tốc & Nâng Cao Chất Lượng Ranking
-rank_opt_col1, rank_opt_col2, rank_opt_col3 = st.columns([1, 1.4, 1.4], gap="small")
+rank_opt_col1, rank_opt_col3 = st.columns(2, gap="small")
 with rank_opt_col1:
     translate_query = st.checkbox(
         "🌐 Dịch VI→EN",
         value=st.session_state.get("cfg_translate", False),
         key="cfg_translate",
         help="Dịch truy vấn tiếng Việt sang tiếng Anh trước khi đưa vào SigLIP. Bật khi nhập tiếng Việt.",
-    )
-with rank_opt_col2:
-    blip2_rerank = st.checkbox(
-        "⚡ BLIP-2 GPU Reranker",
-        value=st.session_state.get("cfg_blip2_rerank", False),
-        key="cfg_blip2_rerank",
-        help="Sử dụng Cross-Attention BLIP-2 ITM trên GPU để soi chi tiết từng pixel, đẩy keyframe chuẩn xác nhất lên Top 1 (arXiv:2512.12935v1).",
     )
 with rank_opt_col3:
     temporal_nms = st.checkbox(
@@ -1476,7 +1254,7 @@ with st.expander("📂 Cấu hình Thư mục Dữ liệu Gốc (Chỉ cần đi
         "📂 Thư mục Gốc Dự án / Data (Master Root):",
         value=st.session_state.get("cfg_master_root", DEFAULT_MASTER_ROOT),
         key="cfg_master_root",
-        help="Ví dụ: D:\\bachkhoa\\ai_challenge hoặc D:\\bachkhoa\\ai_challenge\\data. Hệ thống sẽ tự động tìm thấy toàn bộ manifest, features, keyframes, videos, map-keyframes!",
+        help="Chọn thư mục data chứa processed và extracted. Đường dẫn mặc định được dò theo vị trí project.",
     )
     
     # Auto-resolve all paths from single root input and active model choice
@@ -1486,19 +1264,17 @@ with st.expander("📂 Cấu hình Thư mục Dữ liệu Gốc (Chỉ cần đi
     with col_p1:
         st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["manifest"]).exists() else "🔴"} Manifest ({model_choice})</span><span class="path-val" title="{auto_paths["manifest"]}">{Path(auto_paths["manifest"]).name}</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["features"]).exists() else "🔴"} Features ({model_choice})</span><span class="path-val" title="{auto_paths["features"]}">{Path(auto_paths["features"]).name}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["asr_features"]).exists() else "⚪"} Dense ASR Features</span><span class="path-val" title="{auto_paths["asr_features"]}">{Path(auto_paths["asr_features"]).name}</span></div>', unsafe_allow_html=True)
     with col_p2:
         st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["keyframes"]).exists() else "🔴"} Keyframes Dir</span><span class="path-val" title="{auto_paths["keyframes"]}">{auto_paths["keyframes"]}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["videos"]).exists() else "⚪"} Videos (.mp4) Dir</span><span class="path-val" title="{auto_paths["videos"]}">{auto_paths["videos"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["videos"]).exists() else "⚪"} Videos (.mp4 / .mov) Dir</span><span class="path-val" title="{auto_paths["videos"]}">{auto_paths["videos"]}</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="path-card"><span class="path-label">{"🟢" if Path(auto_paths["map_keyframes"]).exists() else "⚪"} Map Keyframes (.csv)</span><span class="path-val" title="{auto_paths["map_keyframes"]}">{auto_paths["map_keyframes"]}</span></div>', unsafe_allow_html=True)
 
     with st.expander("🔧 Tùy chỉnh chi tiết từng file riêng lẻ (Tùy chọn nâng cao)", expanded=False):
         st.text_input("Backend API", "http://127.0.0.1:8000", key="cfg_backend")
         st.text_input("Manifest JSONL (Tự động theo model)", auto_paths["manifest"], disabled=True)
         st.text_input("Feature .npy (Tự động theo model)", auto_paths["features"], disabled=True)
-        st.text_input("Dense ASR Feature .npy (BGE-M3)", auto_paths["asr_features"], disabled=True)
         st.text_input("Root Keyframes", auto_paths["keyframes"], key="cfg_root")
-        st.text_input("Root Videos (.mp4)", auto_paths["videos"], key="cfg_videos_root")
+        st.text_input("Root Videos (.mp4 / .mov)", auto_paths["videos"], key="cfg_videos_root")
         st.text_input("Thư mục map-keyframes (.csv)", auto_paths["map_keyframes"], key="cfg_map_keyframes")
         st.text_input("CLIP / SigLIP model", auto_paths["clip_model"], disabled=True)
         st.text_input("CLIP / SigLIP pretrained", auto_paths["clip_pretrained"], disabled=True)
@@ -1508,7 +1284,6 @@ st.markdown("</div>", unsafe_allow_html=True)
 # Lấy các đường dẫn thực thi tự động theo model đang chọn
 active_manifest = auto_paths["manifest"]
 active_features = auto_paths["features"]
-active_asr_features = auto_paths["asr_features"]
 active_root = st.session_state.get("cfg_root") or auto_paths["keyframes"]
 active_videos_root = st.session_state.get("cfg_videos_root") or auto_paths["videos"]
 active_map_keyframes = st.session_state.get("cfg_map_keyframes") or auto_paths["map_keyframes"]
@@ -1516,48 +1291,11 @@ active_clip_model = auto_paths["clip_model"]
 active_clip_pretrained = auto_paths["clip_pretrained"]
 
 
-@st.cache_resource(show_spinner=False)
-def preload_all_resources(
-    manifest_path: str,
-    features_path: str,
-    clip_model: str,
-    clip_pretrained: str,
-):
-    """Pre-warm all heavy models, CUDA kernels, and tables at startup."""
-    # 1. Preload all UI manifest tables (keyframes, asr, ocr, timelines)
-    load_all_manifest_tables(manifest_path)
-
-    # 2. Run a 1-shot micro warmup query so load_orchestrator, SigLIP 2, BM25, and CUDA are 100% primed
-    from aic2026.app.api import TaskRequest, RuntimeConfig, run_task
-    try:
-        warmup_req = TaskRequest(
-            query_id="warmup-startup",
-            text="warmup",
-            runtime=RuntimeConfig(
-                manifest_path=manifest_path,
-                features_path=features_path,
-                clip_model=clip_model,
-                clip_pretrained=clip_pretrained,
-                vlm_backend="none",
-                search_mode="hybrid",
-                coarse_top_k=10,
-            ),
-        )
-        run_task("kis", warmup_req)
-    except Exception:
-        pass
-    return True
-
-
-# Tự động nạp trước toàn bộ tài nguyên khi vừa mở ứng dụng
-if active_manifest and Path(active_manifest).exists():
-    with st.spinner("🚀 Đang nạp trước toàn bộ mô hình và dữ liệu (SigLIP 2, BM25, 177k keyframes)..."):
-        preload_all_resources(
-            active_manifest,
-            active_features,
-            active_clip_model,
-            active_clip_pretrained,
-        )
+# Load on the first query so the interface is usable while the model is downloaded.
+if not Path(active_manifest).is_file() or not Path(active_features).is_file():
+    st.warning("Thiếu manifest hoặc embedding SigLIP2. Kiểm tra thư mục dữ liệu ở trên.")
+else:
+    st.caption("Sẵn sàng dùng embedding SigLIP2 có sẵn · Mô hình truy vấn được nạp ở lần tìm đầu tiên.")
 
 if st.session_state.get("_run_agent"):
     st.session_state["_run_agent"] = False
@@ -1578,25 +1316,18 @@ if st.session_state.get("_run_agent"):
                     "ollama_url": st.session_state.get("cfg_ollama", "http://127.0.0.1:11434"),
                     "metadata_filter": st.session_state.get("cfg_filter", ""),
                     "translate_query": bool(st.session_state.get("cfg_translate", False)),
-                    "search_mode": str(st.session_state.get("search_mode", "hybrid") or "hybrid"),
+                    "search_mode": "siglip",
                     "coarse_top_k": int(st.session_state.get("cfg_coarse_top_k", 200)),
                     "vlm_backend": "none",
-                    "blip2_rerank_enabled": bool(st.session_state.get("cfg_blip2_rerank", False)),
+                    "blip2_rerank_enabled": False,
                     "blip2_top_k": 30,
                     "temporal_nms_enabled": bool(st.session_state.get("cfg_temporal_nms", True)),
                 }
                 backend_url = st.session_state.get("cfg_backend", "http://127.0.0.1:8000")
 
                 loading_box = st.empty()
-                mode_label = {
-                    "hybrid": "Đa kênh Hybrid (SigLIP 2 + OCR + ASR)",
-                    "siglip": "Thị giác SigLIP 2 (Visual Only)",
-                    "asr": "Lời thoại âm thanh (ASR BGE-M3)",
-                    "ocr": "Chữ trên màn hình (OCR BM25)",
-                }.get(runtime["search_mode"], runtime["search_mode"].upper())
+                mode_label = "SigLIP2 · Keyframe BTC"
 
-                if runtime["blip2_rerank_enabled"]:
-                    mode_label += " • ⚡ BLIP-2 ITM GPU"
                 if runtime["temporal_nms_enabled"]:
                     mode_label += " • 🎯 NMS Diversity"
 
@@ -1608,7 +1339,7 @@ if st.session_state.get("_run_agent"):
                   </div>
                   <div class="peg-loader-title">Đang quét tìm kiếm Keyframe...</div>
                   <div class="peg-loader-sub">
-                    Đối chiếu không gian vector trên <b>177,321</b> khung hình video
+                    Đối chiếu truy vấn với embedding SigLIP2 đã xử lý
                   </div>
                   <div class="peg-loader-badge">{model_choice} • {mode_label}</div>
                 </div>
@@ -1665,7 +1396,7 @@ else:
     selected: list[int] = st.session_state["selected"]
 
     if not candidates:
-        st.warning("Không tìm thấy candidate phù hợp. Hãy thử đổi query hoặc chế độ tìm kiếm.")
+        st.warning("Không tìm thấy candidate phù hợp. Hãy thử mô tả hình ảnh cụ thể hơn.")
     else:
         total = len(candidates)
         candidates.sort(key=lambda c: c.score, reverse=True)

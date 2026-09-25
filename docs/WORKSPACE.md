@@ -1,3 +1,18 @@
+# Bố trí hiện tại (2026-09-25)
+
+Workspace `C:/Users/Begasus/bachkhoa/ai_challenge`, repository `AIC/`.
+Dữ liệu dùng cho runtime ở `data/processed/siglip2_{manifest.jsonl,features.npy}`;
+keyframe BTC ở `data/extracted/keyframes`, CSV ở `data/extracted/map_keyframes`.
+Index đã có cả 873 video L và 614 video M/N/S, tổng 397.591 vector × 1152.
+Không cần chạy pipeline CPU/Kaggle/embedding cũ để mở app.
+`config/datasets.json` là inventory, không phải cấu hình runtime. Xem README
+để đổi `AIC_DATA_ROOT`. Giữ nguyên toàn bộ ảnh, vector, mapping và index cũ.
+
+Thông tin lịch sử trên máy trước được giữ dưới đây để đối chiếu, không dùng
+các trạng thái “chưa embedding” hoặc quyết định CPU cũ cho runtime hiện tại.
+
+---
+
 # Bố trí workspace và tiếp nhận batch2
 
 Gốc máy hiện tại: `D:\bachkhoa\ai_challenge`. Git repository: `my-repo`, remote `https://github.com/leantri06/AIC.git`.

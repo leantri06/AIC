@@ -9,39 +9,9 @@ def resolve_keyframe_path(keyframe_path: str | Path | None) -> Path | None:
     """Resolve a manifest-relative or cross-machine keyframe path against actual filesystem locations."""
     if not keyframe_path:
         return None
-    candidate = Path(keyframe_path)
-    if candidate.exists():
-        return candidate
-
-    parts = candidate.parts
-    rel_candidates: list[Path] = []
-    if "Keyframes" in parts:
-        kf_idx = parts.index("Keyframes")
-        rel_candidates.append(Path(*parts[kf_idx + 1 :]))
-        rel_candidates.append(Path(*parts[kf_idx:]))
-    elif len(parts) >= 2:
-        rel_candidates.append(Path(parts[-2]) / parts[-1])
-
-    rel_candidates.append(candidate)
-    if len(parts) >= 1:
-        rel_candidates.append(Path(parts[-1]))
-
-    root = Path.cwd()
-    for rel in rel_candidates:
-        for probe in (
-            Path(r"D:\ai_challenge\data\extracted\Keyframes") / rel,
-            Path(r"D:\ai_challenge\data\extracted") / rel,
-            Path(r"D:\ai_challenge\data\raw\Keyframes") / rel,
-            root / rel,
-            root / "data" / rel,
-            root / "data" / "raw" / rel,
-            root / "data" / "extracted" / rel,
-            root / "data" / "raw" / "Keyframes" / rel,
-            root / "data" / "extracted" / "Keyframes" / rel,
-        ):
-            if probe.exists():
-                return probe
-    return None
+    from aic2026.paths import resolve_keyframe
+    candidate = resolve_keyframe(str(keyframe_path))
+    return candidate if candidate.is_file() else None
 
 
 _VI_PATTERN = re.compile(

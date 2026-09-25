@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 # Fix OpenMP duplicate lib runtime conflict on Windows (Error #15 / 0xC0000005)
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
@@ -54,7 +55,7 @@ class OpenCLIPTextEmbedder:
     """Text encoder matching CLIP/SigLIP/SigLIP 2 features with multi-template prompt ensembling."""
     def __init__(
         self,
-        model_name: str = "ViT-SO400M-14-SigLIP-384",
+        model_name: str = "siglip2",
         pretrained: str = "webli",
         device: str | None = None,
         use_ensemble: bool = True,
@@ -81,7 +82,7 @@ class OpenCLIPTextEmbedder:
             self.model, self.preprocess, self.tokenizer = _MODEL_CACHE[cache_key]
         else:
             self.model, _, self.preprocess = open_clip.create_model_and_transforms(
-                self.model_name, pretrained=self.pretrained, device=self.device
+                self.model_name, pretrained=self.pretrained, device="cpu"
             )
             # Purge massive vision transformer (saves ~3.5GB RAM on CPU, prevents disk paging)
             if hasattr(self.model, "visual"):
@@ -90,6 +91,7 @@ class OpenCLIPTextEmbedder:
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            self.model.to(self.device)
             self.tokenizer = self._get_tokenizer_safe(self.model_name)
             self.model.eval()
             _MODEL_CACHE[cache_key] = (self.model, self.preprocess, self.tokenizer)
@@ -170,12 +172,13 @@ class OpenCLIPTextEmbedder:
         if str(self.device).lower().startswith("cuda") and not torch.cuda.is_available():
             self.device = "cpu"
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(
-            self.model_name, pretrained=self.pretrained, device=self.device
+            self.model_name, pretrained=self.pretrained, device="cpu"
         )
         if hasattr(self.model, "visual"):
             del self.model.visual
         import gc
         gc.collect()
+        self.model.to(self.device)
         self.tokenizer = self._get_tokenizer_safe(self.model_name)
         self.model.eval()
 

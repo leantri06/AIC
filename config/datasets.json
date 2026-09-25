@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "path_base": "workspace (parent of repository)",
-  "note": "Inventory and planned layout only; not consumed by the application yet.",
+  "note": "Inventory only. Runtime resolves AIC_DATA_ROOT or data next to the repository; active_index describes the audited combined BTC/SigLIP2 files.",
   "batches": {
     "batch1": {
       "status": "existing",
@@ -11,9 +11,8 @@
     },
     "batch2": {
       "status": "extracted_and_audited",
-      "keyframe_source": "cpu",
-      "keyframe_count": 670151,
-      "embedding_status": "local_sample_verified_kaggle_not_run",
+      "keyframe_source": "btc",
+      "embedding_status": "user_completed_combined_siglip2",
       "kaggle_sample": "data/batches/batch2/kaggle-sample",
       "kaggle_full_package": "data/batches/batch2/kaggle-full",
       "raw": "data/batches/batch2/raw",
@@ -30,5 +29,15 @@
     }
   },
   "combined_output": "data/combined",
-  "active_data_root": "data"
+  "active_data_root": "data",
+  "active_index": {
+    "manifest": "data/processed/siglip2_manifest.jsonl",
+    "features": "data/processed/siglip2_features.npy",
+    "model": "siglip2",
+    "keyframe_source": "btc",
+    "rows": 397591,
+    "dimension": 1152,
+    "videos": 1487,
+    "audit": "data/processed/siglip2_audit.json"
+  }
 }

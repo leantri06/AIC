@@ -12,7 +12,6 @@ from .index import VectorIndex
 from .video_metadata import VideoMetadataStore
 
 if TYPE_CHECKING:
-    from .bm25_index import BM25Index
     from .vectordb import ChromaVectorStore
 
 
@@ -47,8 +46,6 @@ class RetrievalPipeline:
         manifest: list[FrameRecord],
         frames_per_video: int = 3,
         video_metadata: VideoMetadataStore | None = None,
-        asr_features: np.ndarray | None = None,
-        encode_asr: Any | None = None,
     ) -> None:
         if len(index.vectors) != len(manifest):
             raise ValueError("Feature count must equal manifest record count")
@@ -59,8 +56,6 @@ class RetrievalPipeline:
         self.index = index
         self.manifest = manifest
         self.frames_per_video = frames_per_video
-        self.asr_features = asr_features
-        self.encode_asr = encode_asr
         # Per-video metadata (title/description/keywords) lives outside the
         # manifest now to avoid 200x duplication. When provided, metadata
         # filters and BM25 tokenization consult it instead of scanning every
@@ -871,200 +866,9 @@ class RetrievalPipeline:
     # Hybrid retrieval
     # ------------------------------------------------------------------
 
-    def hybrid_retrieve_raw(
-        self,
-        text_query: str,
-        text_embedding: np.ndarray,
-        bm25_index: BM25Index,
-        top_frames: int = 500,
-        video_ids: set[str] | None = None,
-    ) -> list[Candidate]:
-        """Return raw candidates from vector and BM25 retrieval using RRF.
 
-        The vector tier is pushed down with *video_ids* (Chroma ``where`` /
-        FAISS mask) so off-topic videos never enter the fused pool.
-        """
 
-        vector_ids, _ = self.search_with_filter(
-            text_embedding,
-            top_frames,
-            video_ids,
-        )
 
-        bm25_ids, _ = bm25_index.search(
-            text_query,
-            top_frames,
-        )
-
-        fused_scores = self._rrf_fuse(
-            [vector_ids, bm25_ids],
-        )
-
-        return self._candidates_from_scores(
-            fused_scores,
-            limit=top_frames,
-        )
-
-    def adaptive_multimodal_retrieve_raw(
-        self,
-        visual_query: str,
-        text_embedding: np.ndarray,
-        bm25_index: BM25Index,
-        ocr_query: str = "",
-        asr_query: str = "",
-        w_vis: float = 0.6,
-        w_ocr: float = 0.2,
-        w_asr: float = 0.2,
-        top_frames: int = 500,
-        video_ids: set[str] | None = None,
-    ) -> list[Candidate]:
-        """Adaptive multimodal retrieval with dynamic weights and min-max score fusion (AAAI 2026).
-
-        Combines Visual (CLIP), On-Screen Text (OCR), and Speech Transcripts (ASR)
-        using min-max normalized score fusion weighted by the Agent's predicted weights.
-        """
-        def _norm(scores: np.ndarray) -> np.ndarray:
-            if scores.size == 0:
-                return scores
-            s_min = float(scores.min())
-            s_max = float(scores.max())
-            if s_max - s_min < 1e-6:
-                return np.ones_like(scores, dtype=np.float32)
-            return ((scores - s_min) / (s_max - s_min + 1e-6)).astype(np.float32)
-
-        # Normalize weights so sum is 1.0
-        total_w = max(1e-6, w_vis + w_ocr + w_asr)
-        wv, wo, wa = w_vis / total_w, w_ocr / total_w, w_asr / total_w
-
-        fused_scores: dict[int, float] = {}
-
-        # 1. Visual branch (supports GQE Multi-Facet embeddings with SRRF fusion)
-        if wv > 0:
-            if isinstance(text_embedding, list) or (isinstance(text_embedding, np.ndarray) and text_embedding.ndim == 2):
-                facet_list = [np.asarray(e, dtype=np.float32) for e in text_embedding]
-                ranked_results = [self.search_with_filter(emb, top_frames, video_ids) for emb in facet_list]
-                vis_srrf_scores = self._srrf_fuse(ranked_results, k=60)
-                if vis_srrf_scores:
-                    s_vals = np.array(list(vis_srrf_scores.values()), dtype=np.float32)
-                    v_norm = _norm(s_vals)
-                    for (manifest_idx, _), sc in zip(vis_srrf_scores.items(), v_norm):
-                        fused_scores[manifest_idx] = fused_scores.get(manifest_idx, 0.0) + wv * float(sc)
-            else:
-                v_ids, v_scores = self.search_with_filter(text_embedding, top_frames, video_ids)
-                if v_ids.size > 0:
-                    v_norm = _norm(v_scores)
-                    for rank, (idx, sc) in enumerate(zip(v_ids, v_norm)):
-                        manifest_idx = int(idx)
-                        fused_scores[manifest_idx] = fused_scores.get(manifest_idx, 0.0) + wv * (float(sc) + 1.0 / (60 + rank + 1))
-
-        # 2. OCR branch
-        if wo > 0 and not bm25_index.is_empty:
-            q_ocr = ocr_query.strip() if ocr_query.strip() else visual_query
-            o_ids, o_scores = bm25_index.search_ocr(q_ocr, top_frames)
-            if o_ids.size > 0:
-                o_norm = _norm(o_scores)
-                for rank, (idx, sc) in enumerate(zip(o_ids, o_norm)):
-                    manifest_idx = int(idx)
-                    fused_scores[manifest_idx] = fused_scores.get(manifest_idx, 0.0) + wo * (float(sc) + 1.0 / (60 + rank + 1))
-
-        # 3. ASR branch (Hybrid Dense-Sparse Speech Retrieval)
-        if wa > 0:
-            q_asr = asr_query.strip() if asr_query.strip() else visual_query
-            asr_branch_scores: dict[int, float] = {}
-
-            # 3a. Dense Semantic ASR Search (BGE-M3 1024-dim)
-            if self.asr_features is not None and self.encode_asr is not None and q_asr:
-                try:
-                    q_asr_vec = self.encode_asr([q_asr])[0]
-                    sims = np.dot(self.asr_features, q_asr_vec)
-                    if video_ids:
-                        for idx, record in enumerate(self.manifest):
-                            if record.video_id not in video_ids:
-                                sims[idx] = -1.0
-                    k_fetch = min(top_frames, len(sims))
-                    top_dense_indices = np.argpartition(-sims, k_fetch - 1)[:k_fetch]
-                    top_dense_indices = top_dense_indices[np.argsort(-sims[top_dense_indices])]
-                    for r, idx in enumerate(top_dense_indices):
-                        s_val = float(sims[idx])
-                        if s_val > 0.05:
-                            asr_branch_scores[int(idx)] = asr_branch_scores.get(int(idx), 0.0) + 0.65 * (s_val + 1.0 / (60 + r + 1))
-                except Exception as asr_err:
-                    logger.warning("Dense ASR retrieval error: %s", asr_err)
-
-            # 3b. Sparse Lexical ASR Search (BM25)
-            if not bm25_index.is_empty and q_asr:
-                a_ids, a_scores = bm25_index.search_asr(q_asr, top_frames)
-                if a_ids.size > 0:
-                    a_norm = _norm(a_scores)
-                    for rank, (idx, sc) in enumerate(zip(a_ids, a_norm)):
-                        manifest_idx = int(idx)
-                        asr_branch_scores[manifest_idx] = asr_branch_scores.get(manifest_idx, 0.0) + 0.35 * (float(sc) + 1.0 / (60 + rank + 1))
-
-            # Blend into total fused scores
-            for manifest_idx, a_sc in asr_branch_scores.items():
-                fused_scores[manifest_idx] = fused_scores.get(manifest_idx, 0.0) + wa * a_sc
-
-        # Fallback if no modalities returned results
-        if not fused_scores:
-            return self.retrieve_raw(text_embedding, top_frames=top_frames, video_ids=video_ids)
-
-        return self._candidates_from_scores(fused_scores, limit=top_frames)
-
-    def adaptive_multimodal_retrieve(
-        self,
-        visual_query: str,
-        text_embedding: np.ndarray,
-        bm25_index: BM25Index,
-        ocr_query: str = "",
-        asr_query: str = "",
-        w_vis: float = 0.6,
-        w_ocr: float = 0.2,
-        w_asr: float = 0.2,
-        top_frames: int = 500,
-        max_answers: int = 100,
-        video_ids: set[str] | None = None,
-    ) -> list[Candidate]:
-        """Adaptive multimodal retrieval followed by per-video diversification."""
-        raw_candidates = self.adaptive_multimodal_retrieve_raw(
-            visual_query=visual_query,
-            text_embedding=text_embedding,
-            bm25_index=bm25_index,
-            ocr_query=ocr_query,
-            asr_query=asr_query,
-            w_vis=w_vis,
-            w_ocr=w_ocr,
-            w_asr=w_asr,
-            top_frames=top_frames,
-            video_ids=video_ids,
-        )
-        return self.diversify_candidates(
-            candidates=raw_candidates,
-            max_answers=max_answers,
-        )
-
-    def hybrid_retrieve(
-        self,
-        text_query: str,
-        text_embedding: np.ndarray,
-        bm25_index: BM25Index,
-        top_frames: int = 500,
-        max_answers: int = 100,
-        video_ids: set[str] | None = None,
-    ) -> list[Candidate]:
-        """Hybrid retrieval followed by per-video diversification."""
-
-        raw_candidates = self.hybrid_retrieve_raw(
-            text_query=text_query,
-            text_embedding=text_embedding,
-            bm25_index=bm25_index,
-            top_frames=top_frames,
-            video_ids=video_ids,
-        )
-
-        return self.diversify_candidates(
-            candidates=raw_candidates,
-            max_answers=max_answers,
-        )
 
     def retrieve_raw_per_video(
         self,
@@ -1141,27 +945,3 @@ class RetrievalPipeline:
 
         candidates.sort(key=lambda c: c.score, reverse=True)
         return candidates
-
-    def hybrid_retrieve_raw_full(
-        self,
-        text_query: str,
-        text_embedding: np.ndarray,
-        bm25_index: BM25Index,
-        frames_per_video: int = 10,
-        video_ids: set[str] | None = None,
-        limit: int = 5000,
-    ) -> list[Candidate]:
-        """Full-corpus hybrid retrieval: per-video vector top-k (covers every
-        video) fused with BM25 lexical via RRF. Use when the dataset has many
-        videos and we must not miss any video."""
-        vec_candidates = self.retrieve_raw_per_video(
-            text_embedding, frames_per_video=frames_per_video, video_ids=video_ids
-        )
-        vec_ids = np.asarray(
-            [c.vector_id for c in vec_candidates], dtype=np.int64
-        )
-        bm25_ids, _ = bm25_index.search(
-            text_query, min(len(self.manifest), FULL_DATA_CORPUS_TOP_FRAMES)
-        )
-        fused = self._rrf_fuse([vec_ids, bm25_ids])
-        return self._candidates_from_scores(fused, limit=limit)
