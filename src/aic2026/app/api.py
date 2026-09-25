@@ -76,7 +76,7 @@ class RuntimeConfig(BaseModel):
     """Cấu hình nội bộ; UI gửi để backend nạp đúng index/encoder."""
     manifest_path: str | None = None
     features_path: str | None = None
-    clip_model: Literal["siglip2", "ViT-SO400M-14-SigLIP2-378"] = "siglip2"
+    clip_model: Literal["siglip2", "ViT-SO400M-14-SigLIP2-378", "siglip2-giant", "google/siglip2-giant-opt-patch16-384"] = "siglip2"
     clip_pretrained: str = "webli"
     llm_model: str = "qwen3.5:4b"
     ollama_url: str = "http://127.0.0.1:11434"
@@ -144,7 +144,7 @@ def load_orchestrator(
     vlm_timeout: int = 120,
     coarse_top_k: int = 200,
     query_type: str | None = None,
-    clip_model: Literal["siglip2", "ViT-SO400M-14-SigLIP2-378"] = "siglip2",
+    clip_model: Literal["siglip2", "ViT-SO400M-14-SigLIP2-378", "siglip2-giant", "google/siglip2-giant-opt-patch16-384"] = "siglip2",
     vlm_judge_enabled: bool = False,
     vlm_judge_model: str = "Qwen/Qwen2.5-VL-7B-Instruct",
     vlm_judge_backend: str = "qwen",
@@ -156,9 +156,21 @@ def load_orchestrator(
     """Shared layer: index + encoders load once per runtime configuration."""
     from aic2026.agent import OllamaLLM, RetrievalAgent
     from aic2026.agent.tools import RetrievalTools
-    from aic2026.embeddings import OpenCLIPTextEmbedder
 
+    giant = clip_model in ("siglip2-giant", "google/siglip2-giant-opt-patch16-384")
+    if giant:
+        from aic2026.paths import default_data_root
+        folder = Path(manifest_path or features_path).parent if (manifest_path or features_path) else default_data_root() / "processed"
+        manifest_path = manifest_path or str(folder / "siglip2_giant_manifest.jsonl")
+        features_path = features_path or str(folder / "siglip2_giant_features.npy")
     manifest_file, features_file = resolve_feature_sources(manifest_path, features_path)
+    known_pairs = {
+        "siglip2_features.npy": "siglip2_manifest.jsonl",
+        "siglip2_giant_features.npy": "siglip2_giant_manifest.jsonl",
+    }
+    expected_manifest = known_pairs.get(features_file.name)
+    if expected_manifest and manifest_file.name != expected_manifest:
+        raise ValueError(f"{features_file.name} must be paired with {expected_manifest}; row orders differ.")
     missing = [str(path) for path in (manifest_file, features_file) if not path.exists()]
     if missing:
         hint = "Cần cặp siglip2_manifest.jsonl và siglip2_features.npy đã embed sẵn."
@@ -166,7 +178,11 @@ def load_orchestrator(
     pipeline = load_retrieval_pipeline(
         str(manifest_file.resolve()), str(features_file.resolve()), backend, chroma_dir
     )
-    text_encoder = OpenCLIPTextEmbedder(model_name=clip_model, pretrained=clip_pretrained)
+    expected_dimension = 1536 if giant else 1152
+    if pipeline.index.vectors.shape[1] != expected_dimension:
+        raise ValueError(f"Encoder {clip_model} requires {expected_dimension}-D features; select its matching manifest and features.")
+    from aic2026.embeddings.factory import load_text_encoder
+    text_encoder = load_text_encoder(clip_model, clip_pretrained)
     tools = RetrievalTools(
         pipeline, text_encoder.encode, rerank_weight=0.0, object_evidence_weight=0.0,
         colour_rerank_weight=0.0, contrastive_colour_rerank_weight=0.0

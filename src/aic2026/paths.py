@@ -17,7 +17,7 @@ def default_data_root() -> Path:
 
 
 def resolve_data_root_and_paths(base_str: str | Path, model_choice: str = "siglip2") -> dict[str, str]:
-    if model_choice != "siglip2":
+    if model_choice not in ("siglip2", "siglip2-giant"):
         raise ValueError("This application uses the precomputed SigLIP2 index only.")
     s_val = str(base_str).strip(" '\"") if base_str else ""
     base = Path(s_val) if s_val else default_data_root()
@@ -27,14 +27,15 @@ def resolve_data_root_and_paths(base_str: str | Path, model_choice: str = "sigli
         candidates = [data / "extracted" / name for name in names]
         return str(next((p for p in candidates if p.is_dir()), candidates[0]))
 
+    prefix = "siglip2_giant" if model_choice == "siglip2-giant" else "siglip2"
     return {
         "data_dir": str(data),
-        "manifest": str(data / "processed" / "siglip2_manifest.jsonl"),
-        "features": str(data / "processed" / "siglip2_features.npy"),
+        "manifest": str(data / "processed" / f"{prefix}_manifest.jsonl"),
+        "features": str(data / "processed" / f"{prefix}_features.npy"),
         "keyframes": directory("keyframes", "Keyframes"),
         "map_keyframes": directory("map_keyframes", "map-keyframes"),
         "videos": directory("Videos", "videos"),
-        "clip_model": "siglip2",
+        "clip_model": model_choice,
         "clip_pretrained": "webli",
     }
 

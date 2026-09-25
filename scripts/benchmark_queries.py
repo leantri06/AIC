@@ -12,6 +12,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--query", action="append", help="English query; repeat for more cases")
     parser.add_argument("--task", choices=("kis", "qa", "trake"), default="kis")
+    parser.add_argument("--model", choices=("siglip2", "siglip2-giant"), default="siglip2")
     args = parser.parse_args()
     cases = args.query or [
         "a man riding a motorbike on a street",
@@ -20,7 +21,7 @@ def main() -> None:
     for task, text in [("kis", "warmup"), *((args.task, q) for q in cases)]:
         started = perf_counter()
         result = run_task(task, TaskRequest(
-            text=text, runtime=RuntimeConfig(temporal_nms_enabled=True),
+            text=text, runtime=RuntimeConfig(temporal_nms_enabled=True, clip_model=args.model),
         ))
         print(json.dumps({
             "task": task, "query": text, "seconds": round(perf_counter() - started, 3),

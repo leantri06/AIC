@@ -1328,13 +1328,14 @@ def _render_trake_gallery(query: Query, visible: list[tuple[int, Candidate]], ro
 # ---------------------------------------------------------------------------
 # Callback Function for Preset Chips (Executes BEFORE widgets instantiate)
 # ---------------------------------------------------------------------------
-def apply_preset_query(q_type: str, s_mode: str, q_text: str, q_question: str = "", q_events: str = "", model: str = "siglip2"):
+def apply_preset_query(q_type: str, s_mode: str, q_text: str, q_question: str = "", q_events: str = "", model: str | None = None):
     st.session_state["query_type"] = q_type
     st.session_state["search_mode"] = s_mode
     st.session_state["query_text"] = q_text
     st.session_state["query_question"] = q_question
     st.session_state["query_events"] = q_events
-    st.session_state["selected_model_choice"] = model
+    if model is not None:
+        st.session_state["selected_model_choice"] = model
     st.session_state["_run_agent"] = True
 
 
@@ -1374,12 +1375,15 @@ with top_c1:
     )
 with top_c2:
     st.markdown('<div class="mini-label">👁️ Tìm kiếm hình ảnh</div>', unsafe_allow_html=True)
-    st.markdown("**SigLIP2 · SO400M / 378**")
+    model_choice = st.selectbox(
+        "Embedding model", ["siglip2", "siglip2-giant"],
+        format_func=lambda m: "SO400M · 378" if m == "siglip2" else "Giant · 384 (Transformers)",
+        key="selected_model_choice", label_visibility="collapsed",
+    )
     search_mode = "siglip"
 with top_c3:
     st.markdown('<div class="mini-label">🎞️ Nguồn keyframe</div>', unsafe_allow_html=True)
     st.markdown("**Keyframe chính thức BTC**")
-    model_choice = "siglip2"
 with top_c4:
     st.markdown('<div class="mini-label">🌓 Giao diện</div>', unsafe_allow_html=True)
     theme_choice = st.selectbox(
@@ -1437,7 +1441,6 @@ with chip_col1:
             "s_mode": "siglip",
             "q_text": "The clip was filmed from inside a self-driving car; the steering wheel can be clearly seen turning to the right. The camera angle then shifts to the outside, capturing the white car turning left, with a red sign bearing six Chinese characters visible in the upper part of the frame.",
             "q_question": "What number is displayed on the side of the white car?",
-            "model": "siglip2",
         },
         **_FULL_WIDTH,
     )
@@ -1450,7 +1453,6 @@ with chip_col2:
             "q_type": "kis",
             "s_mode": "siglip",
             "q_text": "Một đầu bếp chế biến món ăn trong chảo, với các miếng dồi trường màu trắng và rau xanh. Đầu bếp cho bông hẹ vào chảo.",
-            "model": "siglip2",
         },
         **_FULL_WIDTH,
     )
@@ -1463,7 +1465,6 @@ with chip_col3:
             "q_type": "trake",
             "s_mode": "siglip",
             "q_events": "Một chiếc xe cứu thương màu trắng di chuyển trên đường phố đông đúc.\nXe cứu thương rẽ vào cổng bệnh viện lớn.\nCác nhân viên y tế mở cửa sau xe đẩy cáng cứu thương vào bên trong.",
-            "model": "siglip2",
         },
         **_FULL_WIDTH,
     )
@@ -1476,7 +1477,6 @@ with chip_col4:
             "q_type": "kis",
             "s_mode": "siglip",
             "q_text": "A wide river with houses and green trees along the riverbank",
-            "model": "siglip2",
         },
         **_FULL_WIDTH,
     )
