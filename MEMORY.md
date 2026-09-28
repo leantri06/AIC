@@ -474,3 +474,12 @@ Cập nhật: 2026-09-25 (Asia/Saigon).
   + Cold warmup: 37.6s (nạp Giant text tower weights + nạp 2.4 GB vector matrix 397.591 × 1536).
   + Warm retrieval latency: **0.92s – 1.02s / query**, trả về 100 candidates chính xác.
 - **Git**: Đã commit và push toàn bộ code lên `origin/main` (`3742d71`, `e0add9a`).
+## Thay đổi ghi chú nguồn Batch 2 ngày 2026-09-28
+
+- Google Sheet vẫn có 48 gói, không thêm URL mới, nhưng BTC bổ sung cảnh báo cho
+  `aic26-b2-media-info.zip`: media-info của video `S01-V0*.mp4` phải mang tên
+  `S01-V0*.json`; bảng/gói đang ghi nhầm thành `S01_V0*.json`.
+- Khi tải và nhập media-info chính thức, phải chuẩn hóa riêng tên S01 từ dấu gạch
+  dưới sang gạch nối và kiểm tra mapping theo video ID. Hiện chưa tải/sửa dữ liệu
+  vì đang chờ người dùng quyết định cách dùng các gói chính thức.
+- Bộ keyframe CPU local vẫn nguyên trạng: 495 report, 495 map và không có failure.
